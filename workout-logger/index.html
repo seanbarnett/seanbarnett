@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Workout Logger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      * { -webkit-tap-highlight-color: transparent; }
+      input[type=number]::-webkit-inner-spin-button,
+      input[type=number]::-webkit-outer-spin-button { opacity: 1; }
+    </style>
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      const STORAGE_KEY = 'workout_today';
+
+      function todayStr() {
+        return new Date().toISOString().split('T')[0];
+      }
+
+      function loadExercises() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const data = JSON.parse(raw);
+          if (data.date !== todayStr()) {
+            localStorage.removeItem(STORAGE_KEY);
+            return [];
+          }
+          return Array.isArray(data.exercises) ? data.exercises : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function persist(exercises) {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ date: todayStr(), exercises })
+        );
+      }
+
+      function uid() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+      }
+
+      const EMPTY = { name: '', sets: '', reps: '', weight: '' };
+
+      // ─── ExerciseForm ──────────────────────────────────────────────────────────
+
+      function ExerciseForm({ initial, onSubmit, onCancel, autoFocusName }) {
+        const [f, setF] = useState(
+          initial
+            ? { name: initial.name, sets: String(initial.sets), reps: String(initial.reps), weight: String(initial.weight) }
+            : EMPTY
+        );
+        const nameRef = useRef(null);
+
+        useEffect(() => {
+          if (autoFocusName && nameRef.current) nameRef.current.focus();
+        }, [autoFocusName]);
+
+        const set = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
+
+        const submit = (e) => {
+          e.preventDefault();
+          if (!f.name.trim()) return;
+          onSubmit({
+            name: f.name.trim(),
+            sets: Math.max(0, parseInt(f.sets) || 0),
+            reps: Math.max(0, parseInt(f.reps) || 0),
+            weight: Math.max(0, parseFloat(f.weight) || 0),
+          });
+        };
+
+        const inputCls =
+          'w-full border border-gray-300 rounded-xl px-3 py-3 text-base ' +
+          'focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white';
+
+        return (
+          <form onSubmit={submit} className="bg-white rounded-2xl p-4 shadow space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                Exercise Name
+              </label>
+              <input
+                ref={nameRef}
+                type="text"
+                value={f.name}
+                onChange={set('name')}
+                placeholder="e.g. Bench Press"
+                required
+                className={inputCls}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { key: 'sets', label: 'Sets', placeholder: '3' },
+                { key: 'reps', label: 'Reps', placeholder: '10' },
+                { key: 'weight', label: 'Weight (lbs)', placeholder: '135' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                    {label}
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={f[key]}
+                    onChange={set(key)}
+                    placeholder={placeholder}
+                    min="0"
+                    step={key === 'weight' ? '0.5' : '1'}
+                    className={inputCls + ' text-center'}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                className="flex-1 bg-blue-600 active:bg-blue-700 text-white font-semibold py-3.5 rounded-xl text-base transition-colors"
+              >
+                {initial ? 'Save Changes' : 'Log Exercise'}
+              </button>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex-1 bg-gray-100 active:bg-gray-200 text-gray-700 font-semibold py-3.5 rounded-xl text-base transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        );
+      }
+
+      // ─── ExerciseRow ───────────────────────────────────────────────────────────
+
+      function ExerciseRow({ exercise, onSave, onDelete }) {
+        const [editing, setEditing] = useState(false);
+
+        if (editing) {
+          return (
+            <ExerciseForm
+              initial={exercise}
+              onSubmit={(data) => { onSave(exercise.id, data); setEditing(false); }}
+              onCancel={() => setEditing(false)}
+            />
+          );
+        }
+
+        const detail = [
+          exercise.sets && `${exercise.sets} sets`,
+          exercise.reps && `${exercise.reps} reps`,
+          exercise.weight && `${exercise.weight} lbs`,
+        ].filter(Boolean).join(' · ');
+
+        return (
+          <div className="bg-white rounded-2xl px-4 py-3.5 shadow flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-900 text-base leading-tight truncate">
+                {exercise.name}
+              </p>
+              {detail && (
+                <p className="text-gray-500 text-sm mt-0.5">{detail}</p>
+              )}
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+              <button
+                onClick={() => setEditing(true)}
+                aria-label="Edit exercise"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 active:bg-gray-200 text-gray-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => onDelete(exercise.id)}
+                aria-label="Delete exercise"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 active:bg-red-100 text-red-500 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // ─── App ──────────────────────────────────────────────────────────────────
+
+      function App() {
+        const [exercises, setExercises] = useState(() => loadExercises());
+        const [showAddForm, setShowAddForm] = useState(false);
+
+        // Persist on every change
+        useEffect(() => { persist(exercises); }, [exercises]);
+
+        // Auto-reset at midnight
+        useEffect(() => {
+          const now = new Date();
+          const midnight = new Date(now);
+          midnight.setHours(24, 0, 0, 0);
+          const ms = midnight - now;
+          const t = setTimeout(() => {
+            setExercises([]);
+            localStorage.removeItem(STORAGE_KEY);
+          }, ms);
+          return () => clearTimeout(t);
+        }, []);
+
+        const addExercise = (data) => {
+          setExercises((prev) => [
+            ...prev,
+            { id: uid(), ...data, timestamp: new Date().toISOString() },
+          ]);
+          setShowAddForm(false);
+        };
+
+        const saveExercise = (id, data) => {
+          setExercises((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, ...data } : e))
+          );
+        };
+
+        const deleteExercise = (id) => {
+          setExercises((prev) => prev.filter((e) => e.id !== id));
+        };
+
+        const dateLabel = new Date().toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+        });
+
+        return (
+          <div className="min-h-screen bg-gray-100 pb-8">
+            <div className="max-w-md mx-auto px-4">
+
+              {/* Header */}
+              <div className="pt-8 pb-5">
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Workout Logger</h1>
+                <p className="text-sm text-gray-500 mt-0.5">{dateLabel}</p>
+                {exercises.length > 0 && (
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 text-sm font-medium px-3 py-1 rounded-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    {exercises.length} exercise{exercises.length !== 1 ? 's' : ''} logged
+                  </div>
+                )}
+              </div>
+
+              {/* Add form (inline at top) */}
+              {showAddForm && (
+                <div className="mb-4">
+                  <ExerciseForm
+                    onSubmit={addExercise}
+                    onCancel={() => setShowAddForm(false)}
+                    autoFocusName
+                  />
+                </div>
+              )}
+
+              {/* Exercise list */}
+              {exercises.length === 0 && !showAddForm ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="text-5xl mb-4 select-none">💪</div>
+                  <p className="text-gray-700 font-medium text-lg">No exercises yet</p>
+                  <p className="text-gray-400 text-sm mt-1">Tap "Add Exercise" to get started</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 mb-4">
+                  {exercises.map((ex) => (
+                    <ExerciseRow
+                      key={ex.id}
+                      exercise={ex}
+                      onSave={saveExercise}
+                      onDelete={deleteExercise}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Add button — hidden while add form is open */}
+              {!showAddForm && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="w-full bg-blue-600 active:bg-blue-700 text-white font-semibold py-4 rounded-2xl text-base shadow flex items-center justify-center gap-2 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                  Add Exercise
+                </button>
+              )}
+
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
