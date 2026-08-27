@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financial Dashboard — Sean &amp; Cecilia Barnett</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0f1117; --surface:#1a1d27; --surface2:#222636; --border:#2e3248;
+      --text:#e8eaf0; --muted:#7b82a0;
+      --green:#22d3a5; --red:#f87171; --yellow:#fbbf24;
+      --blue:#60a5fa; --purple:#a78bfa; --orange:#fb923c; --accent:#6366f1;
+    }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif; background:var(--bg); color:var(--text); font-size:14px; line-height:1.5; }
+    .page { max-width:1400px; margin:0 auto; padding:24px 20px 60px; }
+    h2 { font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:14px; }
+    h3 { font-size:15px; font-weight:600; margin-bottom:10px; }
+    .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+    .kpi-grid  { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+    .two-col   { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+    .wide-left { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-bottom:14px; }
+    @media(max-width:960px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.two-col,.wide-left{grid-template-columns:1fr}}
+    .kpi { padding:18px 20px; }
+    .kpi-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px; }
+    .kpi-value { font-size:28px; font-weight:700; letter-spacing:-.5px; line-height:1; }
+    .kpi-sub   { font-size:12px; color:var(--muted); margin-top:5px; }
+
+    /* accounts */
+    .acct-section { margin-bottom:14px; }
+    .acct-type-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:7px; }
+    .acct-row { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-radius:7px; margin-bottom:3px; background:var(--surface2); }
+    .acct-name { font-size:13px; }
+    .acct-name small { color:var(--muted); font-size:11px; display:block; }
+    .acct-bal { font-weight:600; font-size:14px; }
+    .acct-bal.neg { color:var(--red); }
+    .acct-total-row { display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-radius:7px; margin-top:6px; background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.25); }
+    .acct-total-row .lbl { font-size:12px; font-weight:600; color:var(--accent); }
+    .acct-total-row .val { font-size:15px; font-weight:700; }
+
+    /* budget */
+    .budget-group-card { padding:12px 14px; border-radius:8px; background:var(--surface2); }
+    .budget-group-label { font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin-bottom:4px; }
+    .budget-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .progress-bar-wrap { height:5px; background:var(--border); border-radius:99px; margin-top:8px; overflow:hidden; }
+    .progress-bar { height:100%; border-radius:99px; }
+
+    /* budget table */
+    .budget-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .budget-table th { text-align:right; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; padding:0 8px 8px; }
+    .budget-table th:first-child { text-align:left; }
+    .budget-table td { padding:5px 8px; border-top:1px solid var(--border); }
+    .budget-table td:not(:first-child) { text-align:right; }
+    .over  { color:var(--red); }
+    .under { color:var(--green); }
+    .mini-bar-wrap { width:50px; height:4px; background:var(--border); border-radius:99px; overflow:hidden; display:inline-block; }
+    .mini-bar { height:100%; border-radius:99px; }
+
+    /* FIRE */
+    .fire-status-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .fire-loc-card { padding:14px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); cursor:pointer; transition:border-color .2s; }
+    .fire-loc-card.active { border-color:var(--accent); background:rgba(99,102,241,.08); }
+    .fire-loc-name { font-size:12px; font-weight:600; margin-bottom:6px; }
+    .fire-loc-num { font-size:18px; font-weight:700; }
+    .fire-loc-meta { font-size:11px; color:var(--muted); margin-top:3px; }
+    .fire-progress { height:6px; background:var(--border); border-radius:99px; margin-top:10px; overflow:hidden; }
+    .fire-progress-bar { height:100%; border-radius:99px; background:var(--accent); transition:width .4s; }
+
+    /* assumptions */
+    .assumption-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px 24px; }
+    @media(max-width:700px){.assumption-grid{grid-template-columns:1fr}}
+    .assumption-item label { display:flex; justify-content:space-between; align-items:center; font-size:13px; margin-bottom:5px; }
+    .assumption-item label span { font-weight:600; color:var(--accent); }
+    input[type=range] { width:100%; accent-color:var(--accent); cursor:pointer; }
+    select { background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:5px 8px; font-size:13px; width:100%; cursor:pointer; }
+
+    /* scenario table */
+    .scenario-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .scenario-table th { text-align:left; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; padding:0 10px 8px; }
+    .scenario-table th:not(:first-child) { text-align:right; }
+    .scenario-table td { padding:8px 10px; border-top:1px solid var(--border); }
+    .scenario-table td:not(:first-child) { text-align:right; }
+    .scenario-table tr.highlight td { background:rgba(99,102,241,.08); color:var(--accent); font-weight:600; }
+
+    /* income */
+    .income-row { display:flex; justify-content:space-between; align-items:center; padding:9px 12px; border-radius:7px; margin-bottom:4px; background:var(--surface2); }
+    .income-actual { font-weight:600; color:var(--green); }
+    .income-budget { color:var(--muted); }
+
+    /* tabs */
+    .tabs { display:flex; gap:6px; margin-bottom:16px; }
+    .tab { padding:6px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; background:var(--surface2); color:var(--muted); border:1px solid transparent; transition:all .15s; }
+    .tab.active { background:var(--accent); color:#fff; }
+    .tab-panel { display:none; }
+    .tab-panel.active { display:block; }
+
+    /* pill */
+    .pill { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:3px 8px; border-radius:99px; }
+    .pill-green { background:rgba(34,211,165,.1); color:var(--green); }
+    .pill-red   { background:rgba(248,113,113,.1); color:var(--red); }
+    .pill-yellow{ background:rgba(251,191,36,.1); color:var(--yellow); }
+
+    /* live status */
+    #live-status { font-size:11px; color:var(--muted); }
+    #live-status.live  { color:var(--green); }
+    #live-status.error { color:var(--red); }
+
+    .note { font-size:11px; color:var(--muted); margin-top:10px; line-height:1.6; }
+    .section-gap { margin-bottom:14px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+<!-- ════════════════════════════════ HEADER ════════════════════════════════ -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:12px">
+  <div>
+    <div style="font-size:22px;font-weight:700;letter-spacing:-.3px">Financial Dashboard</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:4px">Sean &amp; Cecilia Barnett &nbsp;·&nbsp; Data via Tiller / Google Sheets</div>
+  </div>
+  <div style="text-align:right">
+    <div id="live-status">⬭ loading…</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:3px" id="last-updated"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════ KPI STRIP ════════════════════════════ -->
+<div class="kpi-grid">
+  <div class="card kpi">
+    <div class="kpi-label">Net Worth</div>
+    <div class="kpi-value" style="color:var(--green)" id="kpi-nw">—</div>
+    <div class="kpi-sub" id="kpi-nw-sub"></div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">FIRE Assets</div>
+    <div class="kpi-value" id="kpi-fire-assets">—</div>
+    <div class="kpi-sub" id="kpi-fire-sub"><span class="pill pill-yellow">Early Stage</span></div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">Monthly Cash Flow</div>
+    <div class="kpi-value" id="kpi-cf">—</div>
+    <div class="kpi-sub" id="kpi-cf-sub"></div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-label">Time to FIRE</div>
+    <div class="kpi-value" id="kpi-years">—</div>
+    <div class="kpi-sub" id="kpi-fire-year"></div>
+  </div>
+</div>
+
+<!-- ════════════════════ ACCOUNTS + NET WORTH CHART ════════════════════ -->
+<div class="wide-left section-gap">
+  <div class="card" id="accounts-card">
+    <h2>Accounts</h2>
+    <div id="accounts-body">
+      <div style="color:var(--muted);font-size:13px">Loading accounts…</div>
+    </div>
+  </div>
+  <div class="card" style="display:flex;flex-direction:column">
+    <h2>Net Worth — 12 Month History</h2>
+    <div style="flex:1;min-height:320px;position:relative"><canvas id="nwChart"></canvas></div>
+    <p class="note">Tiller-tracked accounts: checking + savings + investment − credit card.</p>
+  </div>
+</div>
+
+<!-- ════════════════════ PORTFOLIO ════════════════════════════════════════ -->
+<div class="two-col section-gap">
+  <div class="card">
+    <h2>Portfolio Mix (Investment Accounts)</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center">
+      <div style="max-width:220px;margin:0 auto"><canvas id="portfolioDonut"></canvas></div>
+      <div id="portfolioLegend"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Investment Growth — 12 Months</h2>
+    <div style="min-height:220px;position:relative"><canvas id="investChart"></canvas></div>
+    <p class="note" id="invest-note"></p>
+  </div>
+</div>
+
+<!-- ════════════════════ MONTHLY BUDGET ══════════════════════════════════ -->
+<div class="card section-gap">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+    <h2 style="margin:0">Monthly Budget</h2>
+    <span style="font-size:13px;color:var(--muted)" id="budget-period"></span>
+  </div>
+  <div id="budget-income-section"></div>
+  <div class="budget-summary" id="budget-summary-cards"></div>
+  <div class="tabs" id="budget-tabs"></div>
+  <div id="budget-tab-panels"></div>
+</div>
+
+<!-- ════════════════════ FIRE PROJECTIONS ════════════════════════════════ -->
+<div class="card section-gap">
+  <h2>FIRE Projections</h2>
+  <div class="fire-status-grid" id="fireLocCards"></div>
+  <div style="min-height:320px;position:relative;margin-bottom:12px"><canvas id="fireChart"></canvas></div>
+  <p class="note">
+    Real (inflation-adjusted) returns. Anchor year: <span id="note-anchor">2026</span>.
+    Real return = nominal − inflation.
+    FIRE # = baseline spending × retirement adj × geographic adj ÷ SWR.
+    <strong id="note-fire-basis" style="color:var(--yellow)"></strong>
+  </p>
+</div>
+
+<!-- ════════════════════ ASSUMPTIONS PIVOT ═══════════════════════════════ -->
+<div class="two-col section-gap">
+  <div class="card">
+    <h2>Assumptions — Pivot Model</h2>
+    <div class="assumption-grid">
+      <div class="assumption-item">
+        <label>Monthly Investment <span id="lbl-monthly">$2,800</span></label>
+        <input type="range" id="sl-monthly" min="500" max="10000" step="100" value="2800" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Annual Bonus Invested <span id="lbl-bonus">$2,000</span></label>
+        <input type="range" id="sl-bonus" min="0" max="20000" step="500" value="2000" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Expected Nominal Return <span id="lbl-return">10.0%</span></label>
+        <input type="range" id="sl-return" min="4" max="15" step="0.5" value="10" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Expected Inflation <span id="lbl-inflation">2.5%</span></label>
+        <input type="range" id="sl-inflation" min="1" max="6" step="0.5" value="2.5" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Annual Spending (Baseline) <span id="lbl-spending">$75,000</span></label>
+        <input type="range" id="sl-spending" min="30000" max="200000" step="1000" value="75000" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Retirement Adjustment <span id="lbl-retadj">85%</span></label>
+        <input type="range" id="sl-retadj" min="50" max="100" step="5" value="85" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Safe Withdrawal Rate <span id="lbl-swr">4.50%</span></label>
+        <input type="range" id="sl-swr" min="3" max="5.5" step="0.25" value="4.5" oninput="updateModel()">
+      </div>
+      <div class="assumption-item">
+        <label>Geographic Scenario <span id="lbl-geo">Mexico Full-Time</span></label>
+        <select id="sel-geo" onchange="updateModel()">
+          <option value="1.0">🇺🇸 US Full-Time (100%)</option>
+          <option value="0.7">🌮 Mexico Part-Time (70%)</option>
+          <option value="0.55" selected>🌴 Mexico Full-Time (55%)</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">FIRE Number</div>
+        <div style="font-size:18px;font-weight:700;color:var(--accent)" id="out-fire-num">—</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Years to FIRE</div>
+        <div style="font-size:18px;font-weight:700" id="out-years">—</div>
+      </div>
+      <div style="padding:12px;background:var(--surface2);border-radius:8px;text-align:center">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Target Year</div>
+        <div style="font-size:18px;font-weight:700" id="out-year">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Investment Scenario Sensitivity</h2>
+    <table class="scenario-table"><thead><tr><th>Monthly Invest</th><th>Annual Total</th><th>Years</th><th>Year</th><th>Age</th></tr></thead>
+      <tbody id="scenario-tbody"></tbody></table>
+    <div style="margin-top:20px">
+      <h3>SWR Sensitivity</h3>
+      <table class="scenario-table" style="margin-top:10px"><thead><tr><th>Scenario</th><th>SWR</th><th>FIRE #</th><th>Years</th></tr></thead>
+        <tbody id="swr-tbody"></tbody></table>
+    </div>
+    <div style="margin-top:20px">
+      <h3>Location Comparison</h3>
+      <table class="scenario-table" style="margin-top:10px"><thead><tr><th>Location</th><th>Annual Need</th><th>FIRE #</th><th>Years</th></tr></thead>
+        <tbody id="loc-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ BUDGET CHART ════════════════════════════════════ -->
+<div class="card section-gap">
+  <h2>Budget vs Actual by Group</h2>
+  <div style="min-height:240px;position:relative"><canvas id="budgetGroupChart"></canvas></div>
+</div>
+
+</div><!-- /page -->
+<script>
+// ─────────────────────────────────────────────────────────────
+// CONFIG — Google Apps Script /exec URL
+// ─────────────────────────────────────────────────────────────
+var CONFIG = {
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbwmY5TFTB6u9PGQTv-Hfno1d0knZMLd026Wz8QKB_jLNwMKt5AqDIfdkFmb-Dzk-O5TA',
+  BIRTH_YEAR: 1985,
+  START_YEAR: 2026,
+};
+
+// ─────────────────────────────────────────────────────────────
+// FALLBACK STATIC DATA
+// ─────────────────────────────────────────────────────────────
+var STATIC = {
+  balances: {
+    checking: [
+      { name: 'CeciliaSean (xxxx8907)',  updated: 'today',       balance: 1939 },
+      { name: 'LUA BIZ CHK (xxxx6169)', updated: 'today',       balance: 2100 },
+    ],
+    savings: [
+      { name: 'Money Market Savings (xxxx5027)',       updated: 'today',     balance: 14143 },
+      { name: 'IBKR Brokerage Savings / Taxable (xxxx5887)', updated: '1 day ago', balance: 5759 },
+      { name: 'Lively HSA — Sean (xx5471)',             updated: '146 days ago', balance: 3000 },
+    ],
+    investment: [
+      { name: 'Cecilia Roth IRA (IBKR xxxx9267)',              updated: '1 day ago',  balance: 17862 },
+      { name: 'Vanguard Roth IRA — Sean (xxxx3356)',            updated: 'today',      balance: 16815 },
+      { name: 'Gulf Winds 401(k) — Cecilia (xxxx2801)',         updated: 'today',      balance: 12450 },
+      { name: 'TADPULL 401k — Sean (Ascensus xxxx1721)',        updated: '1 day ago',  balance: 13531 },
+      { name: 'Cece HSA (x1722)',                               updated: '18 days ago',balance:  8051 },
+      { name: 'HSA — Sean (Schwab xxxxx682)',                   updated: '1 day ago',  balance:  1846 },
+    ],
+    credit: [
+      { name: 'Chase Sapphire SB (xxxx5386)', updated: '1 day ago', balance: 4204 },
+    ],
+  },
+  history: {
+    checking:    [155, 1123, 514, 151, 4853, 1382, 835, 313, 9176, 1039, 7603, 4039],
+    investment:  [2582, 2759, 5008, 5516, 6711, 12588, 21902, 28214, 32821, 41524, 54061, 70554],
+    savings:     [0, 0, 38, 5485, 7163, 9527, 8905, 8711, 15660, 19534, 22229, 22902],
+    liabilities: [707, 1930, 146, 106, 303, 1482, 2254, 665, 2364, 808, 2861, 4204],
+  },
+  assumptions: {
+    nominalReturn: 0.10, inflation: 0.025, realReturn: 0.073,
+    swr: 0.045, annualSpending: 75000, retirementAdj: 0.85, geoAdj: 0.55,
+    totalMonthly: 2800, bonusAmt: 2000, annualTotal: 35600, inflationAnchor: 2026,
+  },
+  budget: {
+    period: 'April 2026',
+    groups: [
+      { name: 'Income', type: 'income', budget: 9358.33, actual: 9387.41,
+        categories: [
+          { name: 'TadPull',         budget: 5574.53, actual: 5592.73 },
+          { name: 'Gulf Winds',      budget: 3783.80, actual: 3794.68 },
+          { name: 'Dividends, Misc', budget: 0,       actual: 0 },
+        ]
+      },
+      { name: 'Fixed Bills', type: 'expense', budget: 4244.14, actual: 4611.32,
+        categories: [
+          { name: 'Mortgage',        budget: 1461.06, actual: 1374.72 },
+          { name: 'Groceries',       budget: 850,     actual:  819.82 },
+          { name: 'Pet Care',        budget: 225,     actual:  553.91 },
+          { name: 'Tundra Payment',  budget: 500,     actual:  500.00 },
+          { name: 'Internet/Mobile', budget: 218.08,  actual:  259.16 },
+          { name: 'Gym/Yoga',        budget: 161,     actual:  157.88 },
+          { name: 'Car Gas (Exxon)', budget: 250,     actual:  111.32 },
+          { name: 'Car Maintenance', budget: 90,      actual:  155.72 },
+          { name: 'Electric',        budget: 150,     actual:  102.93 },
+          { name: 'Medical Care',    budget: 0,       actual:  199.61 },
+          { name: 'Lawncare',        budget: 90,      actual:  130.00 },
+          { name: 'Rooms2Go',        budget: 100,     actual:  100.00 },
+          { name: 'Water',           budget: 99,      actual:   98.46 },
+          { name: 'Gas',             budget: 50,      actual:   47.79 },
+        ]
+      },
+      { name: 'Guilt Free Spend', type: 'expense', budget: 2610.06, actual: 3898.30,
+        categories: [
+          { name: 'Home Improvements', budget: 200,    actual: 1510.70 },
+          { name: 'Eating Out',         budget: 500,   actual:  633.28 },
+          { name: 'Entertainment',      budget: 300,   actual:  388.69 },
+          { name: 'Gift',               budget: 250,   actual:  307.36 },
+          { name: 'Shopping',           budget: 0,     actual:  356.33 },
+          { name: 'Personal Care',      budget: 250,   actual:  274.53 },
+          { name: 'Personal Dev',       budget: 200,   actual:  227.78 },
+          { name: 'Subscription',       budget: 135.06,actual:  187.24 },
+          { name: 'Travel',             budget: 750,   actual:   10.00 },
+          { name: 'Incidentals',        budget: 25,    actual:    2.39 },
+        ]
+      },
+      { name: 'Save & Invest', type: 'expense', budget: 3250, actual: 3050,
+        categories: [
+          { name: 'Roth Cece',   budget: 500,  actual: 2250 },
+          { name: 'HSA Sean',    budget: 250,  actual:  800 },
+          { name: 'Money Saved', budget: 1000, actual:    0 },
+          { name: 'Roth Sean',   budget: 1500, actual:    0 },
+        ]
+      },
+    ]
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+// MATH HELPERS
+// ─────────────────────────────────────────────────────────────
+var fmt  = function(n, d) { d = d || 0; return '$' + (+n).toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d}); };
+var fmtS = function(n, d) { d = d || 0; return (n < 0 ? '−' : '+') + fmt(Math.abs(n), d); };
+
+function realReturn(nom, inf) { return (1 + nom) / (1 + inf) - 1; }
+function fireNumber(spending, retAdj, geoAdj, swr) { return (spending * retAdj * geoAdj) / swr; }
+
+function yearsToFire(assets, annualInv, rr, fireNum) {
+  var bal = assets, y = 0;
+  while (bal < fireNum && y < 100) { bal = bal * (1 + rr) + annualInv; y++; }
+  return y;
+}
+
+function computeProjections(assets, annualInv, rr, fireNum) {
+  var rows = [];
+  var bal = assets;
+  for (var y = 0; y <= 28; y++) {
+    rows.push({ year: CONFIG.START_YEAR + y, balance: Math.round(bal), ratio: bal / fireNum, gap: Math.max(0, fireNum - bal) });
+    bal = bal * (1 + rr) + annualInv;
+  }
+  return rows;
+}
+
+function sumBalances(accts) { return accts.reduce(function(s, a) { return s + a.balance; }, 0); }
+
+function netWorthFromData(d) {
+  var assets = sumBalances(d.checking) + sumBalances(d.savings) + sumBalances(d.investment);
+  var liab   = sumBalances(d.credit);
+  return assets - liab;
+}
+
+function fireAssetsFromData(d) {
+  return sumBalances(d.investment) + sumBalances(d.savings);
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHART SETUP
+// ─────────────────────────────────────────────────────────────
+Chart.defaults.color = '#7b82a0';
+Chart.defaults.borderColor = '#2e3248';
+Chart.defaults.font.family = "-apple-system,'Inter','Segoe UI',sans-serif";
+
+var MONTHS_LABELS = ['May 25','Jun 25','Jul 25','Aug 25','Sep 25','Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26','Apr 26'];
+
+var nwChart, portfolioChart, investChart, fireChart, budgetChart;
+
+function initCharts() {
+  nwChart = new Chart(document.getElementById('nwChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: MONTHS_LABELS, datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,padding:16}},
+        tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+fmt(ctx.raw)}}} },
+      scales:{ y:{ticks:{callback:function(v){return fmt(v)}}, grid:{color:'#2e3248'}}, x:{grid:{display:false}} } }
+  });
+
+  portfolioChart = new Chart(document.getElementById('portfolioDonut').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: [], datasets: [{ data:[], backgroundColor:[], borderColor:'#1a1d27', borderWidth:3, hoverOffset:6 }] },
+    options: { responsive:true, maintainAspectRatio:true, cutout:'65%',
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:function(ctx){return ' '+ctx.label+': '+fmt(ctx.raw)}}} } }
+  });
+
+  investChart = new Chart(document.getElementById('investChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: MONTHS_LABELS, datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:function(ctx){return ' Investment: '+fmt(ctx.raw)}}} },
+      scales:{ y:{ticks:{callback:function(v){return fmt(v)}}, grid:{color:'#2e3248'}}, x:{grid:{display:false}} } }
+  });
+
+  fireChart = new Chart(document.getElementById('fireChart').getContext('2d'), {
+    type: 'line',
+    data: { labels: [], datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,padding:16}},
+        tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+fmt(ctx.raw)}}} },
+      scales:{ y:{ticks:{callback:function(v){return fmt(v)}}, grid:{color:'#2e3248'}}, x:{grid:{display:false}} } }
+  });
+
+  budgetChart = new Chart(document.getElementById('budgetGroupChart').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom',labels:{boxWidth:12,padding:16}},
+        tooltip:{callbacks:{label:function(ctx){return ' '+ctx.dataset.label+': '+fmt(ctx.raw,2)}}} },
+      scales:{ y:{ticks:{callback:function(v){return fmt(v)}}, grid:{color:'#2e3248'}}, x:{grid:{display:false}} } }
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER FUNCTIONS
+// ─────────────────────────────────────────────────────────────
+var PALETTE = ['#6366f1','#22d3a5','#60a5fa','#a78bfa','#fbbf24','#fb923c','#f472b6','#34d399'];
+
+function renderAccounts(balances) {
+  var sections = [
+    { key:'checking',   label:'Checking' },
+    { key:'investment', label:'Investment' },
+    { key:'savings',    label:'Savings' },
+    { key:'credit',     label:'Credit Card (Liability)', neg:true },
+  ];
+  var html = '';
+  for (var i = 0; i < sections.length; i++) {
+    var section = sections[i];
+    var list = balances[section.key] || [];
+    if (!list.length) continue;
+    var total = list.reduce(function(s,a){return s+a.balance},0);
+    html += '<div class="acct-section"><div class="acct-type-label">'+section.label+'</div>';
+    for (var j = 0; j < list.length; j++) {
+      var a = list[j];
+      html += '<div class="acct-row"><div class="acct-name">'+a.name+(a.updated?'<small>'+a.updated+'</small>':'')+'</div><div class="acct-bal'+(section.neg?' neg':'') + '">'+(section.neg?'−':'')+fmt(a.balance)+'</div></div>';
+    }
+    html += '<div class="acct-total-row"><span class="lbl">'+section.label+' Total</span><span class="val'+(section.neg?' neg':'')+'>'+(section.neg?'−':'')+fmt(total)+'</span></div></div>';
+  }
+
+  var nw = netWorthFromData(balances);
+  var fireAssets = fireAssetsFromData(balances);
+  html += '<div style="margin-top:14px;padding:12px 14px;background:rgba(34,211,165,.06);border:1px solid rgba(34,211,165,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:600">Tracked Net Worth</div><div style="font-size:11px;color:var(--muted);margin-top:2px">All assets − liabilities</div></div><span style="font-size:20px;font-weight:700;color:var(--green)">'+fmt(nw)+'</span></div>';
+  html += '<div style="margin-top:8px;padding:10px 14px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);border-radius:8px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:600">FIRE Assets</div><div style="font-size:11px;color:var(--muted);margin-top:2px">Investment + savings accounts</div></div><span style="font-size:18px;font-weight:700;color:var(--accent)">'+fmt(fireAssets)+'</span></div>';
+
+  document.getElementById('accounts-body').innerHTML = html;
+  return { nw: nw, fireAssets: fireAssets };
+}
+
+function renderHistory(history) {
+  var nwHist = MONTHS_LABELS.map(function(_,i) { return (history.checking[i]||0) + (history.investment[i]||0) + (history.savings[i]||0) - (history.liabilities[i]||0); });
+  nwChart.data.datasets = [
+    { label:'Net Worth', data:nwHist, borderColor:'#22d3a5', backgroundColor:'rgba(34,211,165,.08)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#22d3a5' },
+    { label:'Investment', data:history.investment, borderColor:'#6366f1', backgroundColor:'transparent', tension:0.4, pointRadius:3, borderDash:[4,3] },
+  ];
+  nwChart.update();
+
+  investChart.data.datasets = [{
+    label:'Investment Total', data:history.investment,
+    borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.1)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#6366f1',
+  }];
+  investChart.update();
+
+  var inv = history.investment;
+  var first = inv[0], last = inv[inv.length-1];
+  document.getElementById('invest-note').textContent = 'Investment accounts only. '+MONTHS_LABELS[0]+': '+fmt(first)+' → '+MONTHS_LABELS[MONTHS_LABELS.length-1]+': '+fmt(last)+' ('+((last/first-1)*100).toFixed(0)+'% growth over 12 months)';
+
+  return nwHist;
+}
+
+function renderPortfolio(investments) {
+  portfolioChart.data.labels = investments.map(function(a){return a.name});
+  portfolioChart.data.datasets[0].data = investments.map(function(a){return a.balance});
+  portfolioChart.data.datasets[0].backgroundColor = investments.map(function(_,i){return PALETTE[i%PALETTE.length]});
+  portfolioChart.update();
+
+  var total = investments.reduce(function(s,a){return s+a.balance},0);
+  var legendHtml = '';
+  for (var i = 0; i < investments.length; i++) {
+    var a = investments[i];
+    legendHtml += '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><div style="width:10px;height:10px;border-radius:3px;background:'+PALETTE[i%PALETTE.length]+';flex-shrink:0"></div><div><div style="font-size:12px;line-height:1.3">'+a.name+'</div><div style="font-size:12px;font-weight:600">'+fmt(a.balance)+' <span style="color:var(--muted);font-weight:400;font-size:11px">'+(a.balance/total*100).toFixed(1)+'%</span></div></div></div>';
+  }
+  document.getElementById('portfolioLegend').innerHTML = legendHtml;
+}
+
+function renderBudget(budget) {
+  document.getElementById('budget-period').textContent = budget.period || '';
+
+  var income = null, expenses = [];
+  for (var i = 0; i < budget.groups.length; i++) {
+    var g = budget.groups[i];
+    if (g.type === 'income') income = g;
+    else expenses.push(g);
+  }
+
+  if (income) {
+    var html = '<div style="margin-bottom:16px"><h3 style="font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">Income</h3>';
+    for (var j = 0; j < income.categories.length; j++) {
+      var c = income.categories[j];
+      if (c.actual > 0 || c.budget > 0) {
+        var v = c.actual - c.budget;
+        html += '<div class="income-row"><span>'+c.name+'</span><div style="display:flex;gap:14px;font-size:13px"><span class="income-budget">Budget '+fmt(c.budget)+'</span><span class="income-actual">'+fmt(c.actual)+' <span class="pill '+(v>=0?'pill-green':'pill-red')+'">'+(v>=0?'+':'')+fmt(v)+'</span></span></div></div>';
+      }
+    }
+    var tv = income.actual - income.budget;
+    html += '<div class="income-row" style="background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.2)"><span style="font-weight:700">Total Income</span><div style="display:flex;gap:14px;font-size:13px"><span class="income-budget">Budget '+fmt(income.budget)+'</span><span class="income-actual" style="font-size:15px;font-weight:700">'+fmt(income.actual)+' <span class="pill '+(tv>=0?'pill-green':'pill-red')+'">'+(tv>=0?'+':'')+fmt(tv)+'</span></span></div></div></div>';
+    document.getElementById('budget-income-section').innerHTML = html;
+  }
+
+  var summaryHtml = '';
+  for (var i = 0; i < expenses.length; i++) {
+    var g = expenses[i];
+    var over = g.actual > g.budget;
+    var pct = g.budget>0 ? Math.min(g.actual/g.budget,1.5)*100 : 100;
+    var v = g.actual - g.budget;
+    summaryHtml += '<div class="budget-group-card"><div class="budget-group-label">'+g.name+'</div><div style="display:flex;gap:10px;align-items:baseline"><span style="font-size:20px;font-weight:700;color:'+(over?'var(--red)':'var(--green)')+'">'+fmt(g.actual)+'</span><span style="font-size:12px;color:var(--muted)">/ '+fmt(g.budget)+' budget</span></div><div class="progress-bar-wrap"><div class="progress-bar" style="width:'+Math.min(pct,100)+'%;background:'+(over?'var(--red)':'var(--green)')+'"></div></div><div style="font-size:11px;margin-top:4px;color:'+(over?'var(--red)':'var(--green)')+'">−'+fmt(Math.abs(v))+' '+(over?'over':'under')+' budget</div></div>';
+  }
+  document.getElementById('budget-summary-cards').innerHTML = summaryHtml;
+
+  var tabsEl = document.getElementById('budget-tabs');
+  var panelsEl = document.getElementById('budget-tab-panels');
+  tabsEl.innerHTML = '';
+  panelsEl.innerHTML = '';
+
+  for (var i = 0; i < expenses.length; i++) {
+    (function(idx) {
+      var g = expenses[idx];
+      var id = 'btab-' + idx;
+      var tab = document.createElement('div');
+      tab.className = 'tab' + (idx===0?' active':'');
+      tab.textContent = g.name;
+      tab.onclick = function() {
+        var tabs = document.querySelectorAll('.tab');
+        for (var k = 0; k < tabs.length; k++) tabs[k].classList.remove('active');
+        var panels = document.querySelectorAll('.tab-panel');
+        for (var k = 0; k < panels.length; k++) panels[k].classList.remove('active');
+        tab.classList.add('active');
+        document.getElementById(id).classList.add('active');
+      };
+      tabsEl.appendChild(tab);
+
+      var panel = document.createElement('div');
+      panel.id = id;
+      panel.className = 'tab-panel' + (idx===0?' active':'');
+      var rows = '';
+      for (var j = 0; j < g.categories.length; j++) {
+        var cat = g.categories[j];
+        var cv = cat.actual - cat.budget;
+        var cpct = cat.budget>0 ? Math.min(cat.actual/cat.budget,1.5) : 1;
+        var col = cv > 0 ? '#f87171' : '#22d3a5';
+        rows += '<tr><td>'+cat.name+'</td><td>'+(cat.budget>0?fmt(cat.budget,2):'—')+'</td><td>'+fmt(cat.actual,2)+'</td><td class="'+(cv>0?'over':'under')+'">'+(cv>0?'+':'')+fmt(cv,2)+'</td><td style="width:70px;text-align:right;padding:5px 8px"><div class="mini-bar-wrap"><div class="mini-bar" style="width:'+Math.min(cpct*100,100)+'%;background:'+col+'"></div></div></td></tr>';
+      }
+      panel.innerHTML = '<table class="budget-table"><thead><tr><th>Category</th><th>Budget</th><th>Actual</th><th>Variance</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+      panelsEl.appendChild(panel);
+    })(i);
+  }
+
+  var expLabels = expenses.map(function(g){return g.name}).concat(['Total Income']);
+  var expBudgets = expenses.map(function(g){return g.budget}).concat([income?income.budget:0]);
+  var expActuals = expenses.map(function(g){return g.actual}).concat([income?income.actual:0]);
+  var actColors = expenses.map(function(g){return g.actual>g.budget?'rgba(248,113,113,.6)':'rgba(34,211,165,.5)'}).concat(['rgba(34,211,165,.5)']);
+  var brdColors = expenses.map(function(g){return g.actual>g.budget?'#f87171':'#22d3a5'}).concat(['#22d3a5']);
+
+  budgetChart.data.labels = expLabels;
+  budgetChart.data.datasets = [
+    { label:'Budget', data:expBudgets, backgroundColor:'rgba(99,102,241,.35)', borderColor:'#6366f1', borderWidth:1, borderRadius:4 },
+    { label:'Actual', data:expActuals, backgroundColor:actColors, borderColor:brdColors, borderWidth:1, borderRadius:4 },
+  ];
+  budgetChart.update();
+
+  if (income) {
+    var totalExpenses = expenses.reduce(function(s,g){return s+g.actual},0);
+    var cf = income.actual - totalExpenses;
+    document.getElementById('kpi-cf').textContent = (cf<0?'−':'+')+fmt(Math.abs(cf));
+    document.getElementById('kpi-cf').style.color = cf<0?'var(--red)':'var(--green)';
+    document.getElementById('kpi-cf-sub').textContent = 'Income '+fmt(income.actual)+' · Spend '+fmt(totalExpenses);
+  }
+}
+
+var GEO_OPTS = [
+  { label:'🇺🇸 US Full-Time',    geo:1.0 },
+  { label:'🌮 Mexico Part-Time', geo:0.7 },
+  { label:'🌴 Mexico Full-Time', geo:0.55 },
+];
+var GEO_NAMES = { '1.0':'US Full-Time', '0.7':'Mexico Part-Time', '0.55':'Mexico Full-Time' };
+
+function renderFireCards(fireAssets, assumptions) {
+  var rr = realReturn(assumptions.nominalReturn, assumptions.inflation);
+  var annualInv = assumptions.totalMonthly * 12 + assumptions.bonusAmt;
+  var spending  = assumptions.annualSpending;
+  var retAdj    = assumptions.retirementAdj;
+  var swr       = assumptions.swr;
+
+  var el = document.getElementById('fireLocCards');
+  var html = '';
+  for (var i = 0; i < GEO_OPTS.length; i++) {
+    var opt = GEO_OPTS[i];
+    var fn  = fireNumber(spending, retAdj, opt.geo, swr);
+    var yrs = yearsToFire(fireAssets, annualInv, rr, fn);
+    var ratio = fireAssets / fn;
+    var isActive = Math.abs(opt.geo - assumptions.geoAdj) < 0.01;
+    html += '<div class="fire-loc-card'+(isActive?' active':'')+'" data-geo="'+opt.geo+'" onclick="selectGeo(this,'+opt.geo+')"><div class="fire-loc-name">'+opt.label+'</div><div class="fire-loc-num">'+fmt(Math.round(fn))+'</div><div class="fire-loc-meta">'+(ratio*100).toFixed(1)+'% funded · '+yrs.toFixed(1)+' yrs</div><div class="fire-progress"><div class="fire-progress-bar" style="width:'+Math.min(ratio*100,100)+'%"></div></div></div>';
+  }
+  el.innerHTML = html;
+}
+
+function selectGeo(el, val) {
+  var cards = document.querySelectorAll('.fire-loc-card');
+  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('active');
+  el.classList.add('active');
+  document.getElementById('sel-geo').value = String(val);
+  updateModel();
+}
+
+var _fireAssets = 0;
+
+function updateModel() {
+  var monthly   = +document.getElementById('sl-monthly').value;
+  var bonus     = +document.getElementById('sl-bonus').value;
+  var nomRet    = +document.getElementById('sl-return').value / 100;
+  var inflation = +document.getElementById('sl-inflation').value / 100;
+  var spending  = +document.getElementById('sl-spending').value;
+  var retAdj    = +document.getElementById('sl-retadj').value / 100;
+  var swr       = +document.getElementById('sl-swr').value / 100;
+  var geo       = +document.getElementById('sel-geo').value;
+
+  document.getElementById('lbl-monthly').textContent   = fmt(monthly);
+  document.getElementById('lbl-bonus').textContent     = fmt(bonus);
+  document.getElementById('lbl-return').textContent    = (nomRet*100).toFixed(1)+'%';
+  document.getElementById('lbl-inflation').textContent = (inflation*100).toFixed(1)+'%';
+  document.getElementById('lbl-spending').textContent  = fmt(spending);
+  document.getElementById('lbl-retadj').textContent    = (retAdj*100).toFixed(0)+'%';
+  document.getElementById('lbl-swr').textContent       = (swr*100).toFixed(2)+'%';
+  document.getElementById('lbl-geo').textContent       = GEO_NAMES[String(geo)] || '';
+
+  var rr       = realReturn(nomRet, inflation);
+  var annualInv = monthly * 12 + bonus;
+  var fn        = fireNumber(spending, retAdj, geo, swr);
+  var yrs       = yearsToFire(_fireAssets, annualInv, rr, fn);
+  var targetYear = CONFIG.START_YEAR + yrs;
+
+  document.getElementById('kpi-years').textContent    = yrs.toFixed(1) + ' yrs';
+  document.getElementById('kpi-fire-year').textContent = 'Target ' + targetYear + ' · Age ' + (targetYear - CONFIG.BIRTH_YEAR);
+  document.getElementById('out-fire-num').textContent  = fmt(Math.round(fn));
+  document.getElementById('out-years').textContent     = yrs.toFixed(1);
+  document.getElementById('out-year').textContent      = targetYear;
+
+  for (var i = 0; i < GEO_OPTS.length; i++) {
+    var opt = GEO_OPTS[i];
+    var card = document.querySelector('.fire-loc-card[data-geo="'+opt.geo+'"]');
+    if (!card) continue;
+    var fn2   = fireNumber(spending, retAdj, opt.geo, swr);
+    var y2    = yearsToFire(_fireAssets, annualInv, rr, fn2);
+    var ratio = _fireAssets / fn2;
+    card.querySelector('.fire-loc-num').textContent  = fmt(Math.round(fn2));
+    card.querySelector('.fire-loc-meta').textContent = (ratio*100).toFixed(1)+'% funded · '+y2.toFixed(1)+' yrs';
+    card.querySelector('.fire-progress-bar').style.width = Math.min(ratio*100,100) + '%';
+  }
+
+  var proj = computeProjections(_fireAssets, annualInv, rr, fn);
+  fireChart.data.labels = proj.map(function(r){return r.year});
+  fireChart.data.datasets = [
+    { label:'Projected Assets', data:proj.map(function(r){return r.balance}), borderColor:'#22d3a5', backgroundColor:'rgba(34,211,165,.07)', fill:true, tension:0.4, pointRadius:3 },
+    { label:'FIRE Number',      data:proj.map(function(){return Math.round(fn)}), borderColor:'#f87171', borderDash:[6,4], backgroundColor:'transparent', pointRadius:0, tension:0 },
+  ];
+  fireChart.update();
+
+  var scenarios = [
+    { label:'Current plan',       extra:0 },
+    { label:'+$500/mo',           extra:500*12 },
+    { label:'+$1,000/mo',         extra:1000*12 },
+    { label:'+$2,000/mo',         extra:2000*12 },
+    { label:'+$500/mo + 2× bonus',extra:500*12+bonus },
+  ];
+  var scenarioHtml = '';
+  for (var i = 0; i < scenarios.length; i++) {
+    var s = scenarios[i];
+    var inv2 = annualInv + s.extra;
+    var y2   = yearsToFire(_fireAssets, inv2, rr, fn);
+    var mo   = monthly + s.extra/12;
+    scenarioHtml += '<tr class="'+(i===0?'highlight':'')+'">' +
+      '<td>'+s.label+'</td><td>'+fmt(mo)+'/mo</td><td>'+y2.toFixed(1)+' yrs</td>' +
+      '<td>'+(CONFIG.START_YEAR+y2)+'</td><td>Age '+(CONFIG.START_YEAR+y2-CONFIG.BIRTH_YEAR)+'</td>' +
+      '</tr>';
+  }
+  document.getElementById('scenario-tbody').innerHTML = scenarioHtml;
+
+  var swrScenarios = [
+    {name:'Very Conservative',swr:0.03},{name:'Conservative',swr:0.035},
+    {name:'Traditional (4%)',swr:0.04},{name:'Selected ('+(swr*100).toFixed(2)+'%)',swr:swr},
+  ];
+  var swrHtml = '';
+  for (var i = 0; i < swrScenarios.length; i++) {
+    var s = swrScenarios[i];
+    var fn2 = fireNumber(spending,retAdj,geo,s.swr);
+    var y2  = yearsToFire(_fireAssets,annualInv,rr,fn2);
+    swrHtml += '<tr class="'+(Math.abs(s.swr-swr)<.001?'highlight':'')+'"><td>'+s.name+'</td><td>'+(s.swr*100).toFixed(2)+'%</td><td>'+fmt(Math.round(fn2))+'</td><td>'+y2.toFixed(1)+' yrs</td></tr>';
+  }
+  document.getElementById('swr-tbody').innerHTML = swrHtml;
+
+  var locHtml = '';
+  for (var i = 0; i < GEO_OPTS.length; i++) {
+    var opt = GEO_OPTS[i];
+    var fn2  = fireNumber(spending,retAdj,opt.geo,swr);
+    var need = spending*retAdj*opt.geo;
+    var y2   = yearsToFire(_fireAssets,annualInv,rr,fn2);
+    locHtml += '<tr class="'+(Math.abs(opt.geo-geo)<.01?'highlight':'')+'"><td>'+opt.label+'</td><td>'+fmt(Math.round(need))+'/yr</td><td>'+fmt(Math.round(fn2))+'</td><td>'+y2.toFixed(1)+' yrs</td></tr>';
+  }
+  document.getElementById('loc-tbody').innerHTML = locHtml;
+
+  document.getElementById('kpi-fire-assets').textContent = fmt(_fireAssets);
+  var fn0 = fireNumber(spending,retAdj,geo,swr);
+  document.getElementById('kpi-fire-sub').innerHTML = (_fireAssets/fn0*100).toFixed(1)+'% of '+GEO_NAMES[String(geo)]+' target <span class="pill pill-yellow">Early Stage</span>';
+}
+
+function syncSliders(a) {
+  if (a.nominalReturn)  { document.getElementById('sl-return').value    = (a.nominalReturn*100).toFixed(1); }
+  if (a.inflation)      { document.getElementById('sl-inflation').value = (a.inflation*100).toFixed(1); }
+  if (a.annualSpending) { document.getElementById('sl-spending').value  = a.annualSpending; }
+  if (a.retirementAdj)  { document.getElementById('sl-retadj').value    = (a.retirementAdj*100).toFixed(0); }
+  if (a.swr)            { document.getElementById('sl-swr').value       = (a.swr*100).toFixed(2); }
+  if (a.totalMonthly)   { document.getElementById('sl-monthly').value   = a.totalMonthly; }
+  if (a.bonusAmt)       { document.getElementById('sl-bonus').value     = a.bonusAmt; }
+  if (a.geoAdj) {
+    var geo = a.geoAdj;
+    var closest = [1.0,0.7,0.55].reduce(function(p,c){return Math.abs(c-geo)<Math.abs(p-geo)?c:p},1.0);
+    document.getElementById('sel-geo').value = String(closest);
+  }
+}
+
+function renderAllData(data) {
+  var res = renderAccounts(data.balances);
+  _fireAssets = res.fireAssets;
+
+  renderHistory(data.history);
+  renderPortfolio(data.balances.investment);
+  renderBudget(data.budget);
+  renderFireCards(_fireAssets, data.assumptions);
+
+  document.getElementById('kpi-nw').textContent = fmt(res.nw);
+  document.getElementById('note-fire-basis').textContent = 'FIRE assets = investment + savings accounts from live Tiller balances.';
+
+  if (data.assumptions.inflationAnchor) {
+    document.getElementById('note-anchor').textContent = data.assumptions.inflationAnchor;
+  }
+
+  syncSliders(data.assumptions);
+  updateModel();
+}
+
+async function fetchLiveData() {
+  var statusEl = document.getElementById('live-status');
+  var updatedEl = document.getElementById('last-updated');
+  statusEl.textContent = '⬭ fetching…';
+  statusEl.className = '';
+
+  try {
+    var res  = await fetch(CONFIG.GAS_URL);
+    var data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    renderAllData(data);
+    statusEl.textContent = '⬭ Live';
+    statusEl.className   = 'live';
+    updatedEl.textContent = 'Updated ' + new Date(data.lastUpdated).toLocaleTimeString();
+  } catch (e) {
+    statusEl.textContent = '⬭ Error — using cached data';
+    statusEl.className   = 'error';
+    updatedEl.textContent = e.message;
+    renderAllData(STATIC);
+  }
+}
+
+initCharts();
+fetchLiveData();
+setInterval(fetchLiveData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
