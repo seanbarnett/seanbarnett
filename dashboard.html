@@ -816,6 +816,43 @@ function renderAllData(data) {
   updateModel();
 }
 
+// Google Apps Script's ContentService can't set Access-Control-Allow-Origin,
+// so a plain fetch() gets blocked by CORS no matter what origin this page is
+// served from. JSONP sidesteps that entirely: the response is loaded as a
+// <script> tag (not subject to CORS) and calls back into a global function.
+function jsonpRequest(url, timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    var cbName = '__gasCallback_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    var script = document.createElement('script');
+    var timer;
+
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[cbName] = function(data) {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = function() {
+      cleanup();
+      reject(new Error('Failed to load data from Apps Script'));
+    };
+
+    timer = setTimeout(function() {
+      cleanup();
+      reject(new Error('Request timed out'));
+    }, timeoutMs || 15000);
+
+    var sep = url.indexOf('?') > -1 ? '&' : '?';
+    script.src = url + sep + 'callback=' + cbName;
+    document.head.appendChild(script);
+  });
+}
+
 async function fetchLiveData() {
   var statusEl = document.getElementById('live-status');
   var updatedEl = document.getElementById('last-updated');
@@ -823,8 +860,7 @@ async function fetchLiveData() {
   statusEl.className = '';
 
   try {
-    var res  = await fetch(CONFIG.GAS_URL);
-    var data = await res.json();
+    var data = await jsonpRequest(CONFIG.GAS_URL);
 
     if (data.error) throw new Error(data.error);
 
