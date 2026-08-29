@@ -519,22 +519,32 @@ function renderAccounts(balances) {
 }
 
 function renderHistory(history) {
-  var nwHist = MONTHS_LABELS.map(function(_,i) { return (history.checking[i]||0) + (history.investment[i]||0) + (history.savings[i]||0) - (history.liabilities[i]||0); });
+  // Apps Script returns null for any of these when it can't locate the
+  // matching 12-month row in the Balances sheet — fall back to zeros so
+  // the charts still render instead of throwing.
+  var zeros = MONTHS_LABELS.map(function() { return 0; });
+  var checking    = history.checking    || zeros;
+  var investment  = history.investment  || zeros;
+  var savings     = history.savings     || zeros;
+  var liabilities = history.liabilities || zeros;
+
+  var nwHist = MONTHS_LABELS.map(function(_,i) { return (checking[i]||0) + (investment[i]||0) + (savings[i]||0) - (liabilities[i]||0); });
   nwChart.data.datasets = [
     { label:'Net Worth', data:nwHist, borderColor:'#22d3a5', backgroundColor:'rgba(34,211,165,.08)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#22d3a5' },
-    { label:'Investment', data:history.investment, borderColor:'#6366f1', backgroundColor:'transparent', tension:0.4, pointRadius:3, borderDash:[4,3] },
+    { label:'Investment', data:investment, borderColor:'#6366f1', backgroundColor:'transparent', tension:0.4, pointRadius:3, borderDash:[4,3] },
   ];
   nwChart.update();
 
   investChart.data.datasets = [{
-    label:'Investment Total', data:history.investment,
+    label:'Investment Total', data:investment,
     borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.1)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#6366f1',
   }];
   investChart.update();
 
-  var inv = history.investment;
-  var first = inv[0], last = inv[inv.length-1];
-  document.getElementById('invest-note').textContent = 'Investment accounts only. '+MONTHS_LABELS[0]+': '+fmt(first)+' → '+MONTHS_LABELS[MONTHS_LABELS.length-1]+': '+fmt(last)+' ('+((last/first-1)*100).toFixed(0)+'% growth over 12 months)';
+  var first = investment[0], last = investment[investment.length-1];
+  document.getElementById('invest-note').textContent = first
+    ? 'Investment accounts only. '+MONTHS_LABELS[0]+': '+fmt(first)+' → '+MONTHS_LABELS[MONTHS_LABELS.length-1]+': '+fmt(last)+' ('+((last/first-1)*100).toFixed(0)+'% growth over 12 months)'
+    : 'No 12-month history found in the Balances sheet.';
 
   return nwHist;
 }
