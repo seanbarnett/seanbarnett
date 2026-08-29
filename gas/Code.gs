@@ -27,46 +27,60 @@ function doGet() {
 }
 
 // ─── Balances ────────────────────────────────────────────────────────────────
+// The "Balances" sheet is a formatted dashboard (gauges, colored banners),
+// not a plain data grid, so its visual columns shift around and can't be
+// parsed positionally. Instead we read its "Sorted Assets" / "Sorted
+// Liabilities" reference tables, which list every account in a fixed
+// Row | Id | Group | Account | Last Updated | Balance layout. We locate
+// each table by its header cells rather than hardcoding column numbers,
+// since the dashboard's charts/formatting can shift columns over time.
 function getBalances(ss) {
   var sheet = ss.getSheetByName('Balances');
   if (!sheet) return null;
   var data = sheet.getDataRange().getValues();
 
   var accounts = { checking: [], savings: [], investment: [], credit: [] };
-  var currentType = null;
+  var tableStarts = [];
 
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
-    var label = String(row[0] || '').trim().toUpperCase();
-
-    if (label === 'CHECKING') {
-      currentType = 'checking';
-      continue;
-    } else if (label === 'INVESTMENT') {
-      currentType = 'investment';
-      continue;
-    } else if (label === 'SAVINGS') {
-      currentType = 'savings';
-      continue;
-    } else if (label === 'CREDIT CARD') {
-      currentType = 'credit';
-      continue;
+    for (var c = 0; c + 5 < row.length; c++) {
+      if (String(row[c]).trim() === 'Row' &&
+          String(row[c + 1]).trim() === 'Id' &&
+          String(row[c + 2]).trim() === 'Group' &&
+          String(row[c + 3]).trim() === 'Account') {
+        tableStarts.push({ row: i, col: c });
+      }
     }
-
-    if (!currentType) continue;
-
-    var name = String(row[0] || '').trim();
-    if (!name || name === '' || label.indexOf('TILLER') > -1 || label.indexOf('YEAR') === 0) continue;
-
-    var raw = row[2];
-    var bal = typeof raw === 'number' ? raw : (parseFloat(String(raw).replace(/[$, ]/g, '')) || null);
-    if (bal === null || isNaN(bal)) continue;
-
-    var updated = String(row[1] || '').trim();
-    accounts[currentType].push({ name: name, updated: updated, balance: bal });
   }
 
+  tableStarts.forEach(function(start) {
+    for (var r = start.row + 1; r < data.length; r++) {
+      var row = data[r];
+      var group   = String(row[start.col + 2] || '').trim().toLowerCase();
+      var name    = String(row[start.col + 3] || '').trim();
+      var balance = row[start.col + 5];
+
+      if (!group && !name) break; // blank row = end of this table
+
+      if (!name || typeof balance !== 'number') continue;
+
+      var entry = { name: name, updated: formatUpdated(row[start.col + 4]), balance: balance };
+      if (group === 'checking') accounts.checking.push(entry);
+      else if (group === 'investment') accounts.investment.push(entry);
+      else if (group === 'savings') accounts.savings.push(entry);
+      else if (group === 'credit card') accounts.credit.push(entry);
+    }
+  });
+
   return accounts;
+}
+
+function formatUpdated(daysAgo) {
+  if (typeof daysAgo !== 'number') return String(daysAgo || '');
+  if (daysAgo === 0) return 'today';
+  if (daysAgo === 1) return '1 day ago';
+  return daysAgo + ' days ago';
 }
 
 // ─── Balance History ─────────────────────────────────────────────────────────
