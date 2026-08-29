@@ -519,16 +519,21 @@ function renderAccounts(balances) {
 }
 
 function renderHistory(history) {
-  // Apps Script returns null for any of these when it can't locate the
-  // matching 12-month row in the Balances sheet — fall back to zeros so
-  // the charts still render instead of throwing.
-  var zeros = MONTHS_LABELS.map(function() { return 0; });
+  // Apps Script supplies the real trailing-12-month labels; MONTHS_LABELS is
+  // only a fallback for the static demo data. Any series can come back null
+  // if the Balance History sheet is missing, so default those to zeros
+  // rather than letting the charts throw.
+  var labels = (history && history.labels) || MONTHS_LABELS;
+  var zeros = labels.map(function() { return 0; });
   var checking    = history.checking    || zeros;
   var investment  = history.investment  || zeros;
   var savings     = history.savings     || zeros;
   var liabilities = history.liabilities || zeros;
 
-  var nwHist = MONTHS_LABELS.map(function(_,i) { return (checking[i]||0) + (investment[i]||0) + (savings[i]||0) - (liabilities[i]||0); });
+  nwChart.data.labels = labels;
+  investChart.data.labels = labels;
+
+  var nwHist = labels.map(function(_,i) { return (checking[i]||0) + (investment[i]||0) + (savings[i]||0) - (liabilities[i]||0); });
   nwChart.data.datasets = [
     { label:'Net Worth', data:nwHist, borderColor:'#22d3a5', backgroundColor:'rgba(34,211,165,.08)', fill:true, tension:0.4, pointRadius:4, pointBackgroundColor:'#22d3a5' },
     { label:'Investment', data:investment, borderColor:'#6366f1', backgroundColor:'transparent', tension:0.4, pointRadius:3, borderDash:[4,3] },
@@ -543,8 +548,8 @@ function renderHistory(history) {
 
   var first = investment[0], last = investment[investment.length-1];
   document.getElementById('invest-note').textContent = first
-    ? 'Investment accounts only. '+MONTHS_LABELS[0]+': '+fmt(first)+' → '+MONTHS_LABELS[MONTHS_LABELS.length-1]+': '+fmt(last)+' ('+((last/first-1)*100).toFixed(0)+'% growth over 12 months)'
-    : 'No 12-month history found in the Balances sheet.';
+    ? 'Investment accounts only. '+labels[0]+': '+fmt(first)+' → '+labels[labels.length-1]+': '+fmt(last)+' ('+((last/first-1)*100).toFixed(0)+'% growth over 12 months)'
+    : 'No 12-month history found in the Balance History sheet.';
 
   return nwHist;
 }

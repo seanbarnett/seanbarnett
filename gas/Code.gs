@@ -84,46 +84,132 @@ function formatUpdated(daysAgo) {
 }
 
 // ─── Balance History ─────────────────────────────────────────────────────────
+// Built from Tiller's "Balance History" sheet — one row per account per
+// snapshot. For each of the last 12 months we take each account's most
+// recent snapshot in that month, then sum by the account's Group.
+//
+// Grouping comes from the Accounts sheet, not Balance History's own "Type"
+// column: Type holds raw institution types (ROTH_IRA, CREDIT,
+// HEALTH_SAVINGS_ACCOUNT_HSA), whereas Group holds the Checking / Savings /
+// Investment / Credit Card buckets this dashboard reports on. An HSA, for
+// example, may sit under Investment or Savings depending on how it's been
+// categorized in Accounts.
+var MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
 function getBalanceHistory(ss) {
-  var sheet = ss.getSheetByName('Balances');
+  var sheet = ss.getSheetByName('Balance History');
   if (!sheet) return null;
   var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return null;
 
-  var result = { checking: null, investment: null, savings: null, liabilities: null };
-  var histRows = [];
+  var header = data[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
+  var iDate    = header.indexOf('date');
+  var iAcctId  = header.indexOf('account id');
+  var iAccount = header.indexOf('account');
+  var iBalance = header.indexOf('balance');
+  var iClass   = header.indexOf('class');
+  if (iDate === -1 || iBalance === -1) return null;
 
-  for (var i = 0; i < data.length; i++) {
-    var row = data[i];
-    var count = 0;
-    for (var j = 0; j < 12 && j < row.length; j++) {
-      if (typeof row[j] === 'number' && row[j] >= 0) count++;
-    }
-    if (count >= 10 && String(row[0] || '').trim() === '') {
-      histRows.push({ idx: i, row: row });
+  var groupById = getAccountGroups(ss);
+
+  // The 12 months ending with the current one.
+  var now = new Date();
+  var monthKeys = {};
+  var labels = [];
+  for (var m = 11; m >= 0; m--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+    monthKeys[d.getFullYear() + '-' + d.getMonth()] = 11 - m;
+    labels.push(MONTH_ABBR[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2));
+  }
+
+  // Most recent snapshot per account per month.
+  var latest = {};
+  for (var r = 1; r < data.length; r++) {
+    var row = data[r];
+    var dt = row[iDate];
+    if (!(dt instanceof Date)) continue;
+
+    var mi = monthKeys[dt.getFullYear() + '-' + dt.getMonth()];
+    if (mi === undefined) continue;
+
+    var bal = row[iBalance];
+    if (typeof bal !== 'number') continue;
+
+    var acctId = String((iAcctId !== -1 ? row[iAcctId] : row[iAccount]) || '').trim();
+    if (!acctId) continue;
+
+    var key = acctId + '|' + mi;
+    var existing = latest[key];
+    if (!existing || dt.getTime() > existing.time) {
+      latest[key] = {
+        time: dt.getTime(),
+        balance: bal,
+        acctId: acctId,
+        monthIdx: mi,
+        cls: String((iClass !== -1 ? row[iClass] : '') || '').trim().toLowerCase(),
+      };
     }
   }
 
-  if (histRows.length >= 4) {
-    result.checking = histRows[0].row.slice(0, 12).map(function(v) { return typeof v === 'number' ? v : 0; });
-    var invIdx = -1;
-    for (var i = 1; i < histRows.length; i++) {
-      if (histRows[i].idx > histRows[0].idx + 8) {
-        invIdx = i;
-        break;
-      }
-    }
-    if (invIdx > 0) result.investment = histRows[invIdx].row.slice(0, 12).map(function(v) { return typeof v === 'number' ? v : 0; });
-    var savIdx = -1;
-    for (var i = invIdx + 1; i < histRows.length; i++) {
-      savIdx = i;
-      break;
-    }
-    if (savIdx > invIdx && savIdx >= 0) result.savings = histRows[savIdx].row.slice(0, 12).map(function(v) { return typeof v === 'number' ? v : 0; });
-    var lastHist = histRows[histRows.length - 1];
-    result.liabilities = lastHist.row.slice(0, 12).map(function(v) { return typeof v === 'number' ? v : 0; });
+  var zeros = function() { return labels.map(function() { return 0; }); };
+  var result = {
+    labels: labels,
+    checking: zeros(),
+    investment: zeros(),
+    savings: zeros(),
+    liabilities: zeros(),
+  };
+
+  for (var k in latest) {
+    var e = latest[k];
+    var group = (groupById[e.acctId] || '').toLowerCase();
+
+    var bucket = null;
+    if (group === 'checking') bucket = 'checking';
+    else if (group === 'investment') bucket = 'investment';
+    else if (group === 'savings') bucket = 'savings';
+    else if (group === 'credit card' || e.cls === 'liability') bucket = 'liabilities';
+    if (!bucket) continue;
+
+    // Liabilities are reported as positive magnitudes; the dashboard
+    // subtracts them when computing net worth.
+    result[bucket][e.monthIdx] += bucket === 'liabilities' ? Math.abs(e.balance) : e.balance;
   }
+
+  ['checking', 'investment', 'savings', 'liabilities'].forEach(function(b) {
+    result[b] = result[b].map(round2);
+  });
 
   return result;
+}
+
+// Maps Account Id -> Group using the Accounts sheet, locating both columns
+// by header name so it survives column reordering.
+function getAccountGroups(ss) {
+  var sheet = ss.getSheetByName('Accounts');
+  if (!sheet) return {};
+  var data = sheet.getDataRange().getValues();
+
+  var iId = -1, iGroup = -1, headerRow = -1;
+  for (var r = 0; r < data.length && headerRow === -1; r++) {
+    var row = data[r].map(function(v) { return String(v || '').trim().toLowerCase(); });
+    var idIdx = row.indexOf('account id');
+    var groupIdx = row.indexOf('group');
+    if (idIdx !== -1 && groupIdx !== -1) {
+      iId = idIdx;
+      iGroup = groupIdx;
+      headerRow = r;
+    }
+  }
+  if (headerRow === -1) return {};
+
+  var map = {};
+  for (var i = headerRow + 1; i < data.length; i++) {
+    var id = String(data[i][iId] || '').trim();
+    var group = String(data[i][iGroup] || '').trim();
+    if (id && group) map[id] = group;
+  }
+  return map;
 }
 
 // ─── Assumptions ─────────────────────────────────────────────────────────────
