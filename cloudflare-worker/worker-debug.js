@@ -27,6 +27,8 @@ const DASHBOARD_HTML = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta cha
 
 export default {
   async fetch(request, env) {
+    const url = new URL(request.url);
+
     if (url.pathname === '/debug-auth') {
       const u = url.searchParams.get('u') || '';
       const p = url.searchParams.get('p') || '';
@@ -45,8 +47,6 @@ export default {
 
     const authResponse = checkAuth(request, env);
     if (authResponse) return authResponse;
-
-    const url = new URL(request.url);
 
     if (url.pathname === '/data') {
       return proxyData(env);
