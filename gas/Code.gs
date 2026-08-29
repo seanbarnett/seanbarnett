@@ -9,8 +9,7 @@
 
 var SHEET_ID = '1g0kUMLJWsS5pGwDhMOFHfyoeXldx_2htl2ROvAFpzFc';
 
-function doGet(e) {
-  var callback = e && e.parameter && e.parameter.callback;
+function doGet() {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var payload = {
@@ -21,9 +20,9 @@ function doGet(e) {
       targets: getTargets(ss),
       lastUpdated: new Date().toISOString(),
     };
-    return json(payload, callback);
-  } catch (e2) {
-    return json({ error: e2.message }, callback);
+    return json(payload);
+  } catch (e) {
+    return json({ error: e.message });
   }
 }
 
@@ -249,16 +248,7 @@ function getTargets(ss) {
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
-// GAS's ContentService can't set Access-Control-Allow-Origin, so browsers
-// block cross-origin fetch() reads of the JSON response. When a `callback`
-// query param is present (JSONP), wrap the payload as a script instead —
-// script-tag loads aren't subject to CORS.
-function json(obj, callback) {
-  if (callback && /^[A-Za-z_$][\w$]*$/.test(callback)) {
-    return ContentService
-      .createTextOutput(callback + '(' + JSON.stringify(obj) + ');')
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
+function json(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
