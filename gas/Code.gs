@@ -163,7 +163,7 @@ function getAssumptions(ss) {
     realReturn: toPct(pick('real return (after inflation)')),
     swr: toPct(pick('safe withdrawal rate (real)', 'safe withdrawal rate')),
     annualSpending: pick('annual spending (3-year avg)', 'annual spending', 'normalized baseline spending'),
-    retirementAdj: toPct(pick('retirement adjustment factor', 'retirement adjustment')),
+    retirementAdj: toPct(pick('retirement spending factor', 'retirement adjustment factor', 'retirement adjustment')),
     geoAdj: toPct(pick('selected geographic scenario')),
     inflationAnchor: pick('inflation anchor year'),
     totalMonthly: pick('total monthly investment'),
