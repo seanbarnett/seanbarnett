@@ -29,6 +29,36 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname === '/debug-auth-header') {
+      const header = request.headers.get('Authorization');
+      if (!header) {
+        return new Response('Need credentials', {
+          status: 401,
+          headers: { 'WWW-Authenticate': 'Basic realm="Debug", charset="UTF-8"' },
+        });
+      }
+      let decoded, decodeError = null;
+      try {
+        decoded = atob(header.slice('Basic '.length));
+      } catch (e) {
+        decodeError = e.message;
+        decoded = '';
+      }
+      const sepIdx = decoded.indexOf(':');
+      const u = sepIdx === -1 ? decoded : decoded.slice(0, sepIdx);
+      const p = sepIdx === -1 ? '' : decoded.slice(sepIdx + 1);
+      return new Response(JSON.stringify({
+        rawHeaderStartsBasic: header.startsWith('Basic '),
+        decodeError: decodeError,
+        sepIdxFound: sepIdx !== -1,
+        decodedUserLength: u.length,
+        decodedPassLength: p.length,
+        decodedUserFirstLast: u.length ? (u[0] + '...' + u[u.length-1]) : '(empty)',
+        userMatches: timingSafeEqual(u, env.AUTH_USER),
+        passMatches: timingSafeEqual(p, env.AUTH_PASS),
+      }, null, 2), { headers: { 'content-type': 'application/json' } });
+    }
+
     if (url.pathname === '/debug-auth') {
       const u = url.searchParams.get('u') || '';
       const p = url.searchParams.get('p') || '';
