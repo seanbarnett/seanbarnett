@@ -277,32 +277,5 @@ Rates, limits, and eligibility change. Treat this as structure and get written q
 
 ---
 
-## 11. Gate 0 worksheet: 10814 Newton Cir, Conroe, TX 77303 (Montgomery County)
-Land.com Property ID 1071934. **Listing text supplied by user:** **OFF MARKET**, $129,900, 2.2 acres, **existing 3 bed / 2 bath, 1,776 sq ft preowned brick/wood house**, carport with workshop, "newer roof & A/C," "two full unrestricted acres," "horses allowed," conventional mortgage listed. The listing is *not* vacant land. The price and date are unverified and may be stale. **Gate 0 status: not completed.** My fetch of the page returned HTTP 403, and a web search found no record for this address; the other Newton Circle parcels in search results are not facts about this parcel.
-
-**What the listing changes**
-- **Off market:** it may be sold, withdrawn, or expired. Find the current owner in Montgomery CAD, then ask a local agent to check MLS history and status, or write to the owner.
-- **Existing house = Path B fit, not Path A:** it gives Path B a starting dwelling, likely existing septic and well/water (unverified), and ~2 acres for more. It is overbuilt and probably over-priced for Path A.
-- **Existing house raises new checks:** permits and age of the septic (OSSF) record, well/water source, flood history in the house itself, condition/inspection, and whether additional houses are allowed under septic area and setbacks. Existing improvements also mean the seller disclosure (Prop. Code §5.008) likely applies [K].
-- **"Unrestricted," "horses allowed":** marketing claims. Confirm via recorded restrictions (Gate 1) and Schedule B.
-- **Financing:** an existing home opens USDA/FHA/VA/conventional options (see §10). USDA eligibility depends on the address; check it. Adding more houses later is the hard part (separate lots, platting).
-- **Price sanity:** $129,900 for a 2.2-acre house near Conroe looks old or low. Treat it as a historical data point and get fresh comps.
-
-| Step | Status | Next action (Montgomery County specifics are [V]) |
-|---|---|---|
-| 1. Parcel lookup | **Unknown** | Search Montgomery CAD (mcad-tx.org) by address "10814 Newton Cir." Record account number, owner, acreage, taxing units (MUD? ESD?), delinquent taxes. If the address returns nothing, the listing address may be approximate: use the listing map pin. |
-| 2. City / ETJ | **Unknown** | Check Conroe city limits/ETJ via the City of Conroe planning map and the taxing-unit list from step 1 |
-| 3. Flood | **Unknown** | FEMA map + imagery from Sept 2017 and Sept 2019. The east-county area has flooding history from multiple events; do not assume dry. |
-| 4. Access | **Unknown** | Is Newton Cir county-maintained or private? Ask Montgomery County Engineering/road dept. |
-| 5. Restrictions | **Unknown** | Search the Montgomery County Clerk records for "Newton Acres" (a nearby subdivision name from search results) and for the parent tract. Neighbor listings advertise "unrestricted," which is marketing, so confirm via Schedule B. |
-| 6. Wells / pipelines | **Unknown** | RRC public GIS viewer |
-| 7. Utilities | **Unknown** | Electric provider is likely Entergy Texas or a co-op in this area [V]. Wells fall under Lone Star Groundwater Conservation District rules [V]. OSSF authority: ask Montgomery County's environmental/permits department. |
-
-**Leads from search (other parcels, unverified):** nearby Newton Circle listings described ~2-acre lots as "unrestricted," one with "history of no flooding"; a nearby home sold on 2.2 unrestricted acres. These suggest the area *may* be lightly restricted, but treat that as a hypothesis for Gates 1–3.
-
-**Questions to ask for this specific listing:**
-- "What is the Montgomery CAD account number and recorded legal description for 10814 Newton Cir.?"
-- "Is the lot platted (Newton Acres or other), or a metes-and-bounds tract? Are there recorded restrictions or an HOA?"
-- "Is the road county-maintained? Is legal access recorded?"
-- "Has the property flooded, including during Harvey and Imelda? Any flood insurance claims?"
-- "Is there a septic or well history, and which electric provider serves it?"
+## 11. Tracking
+Candidate parcels are tracked in two separate files: `path-a-options.md` (RV plot) and `path-b-options.md` (2–5 acres, multiple houses). Use the gate numbers from §4.
