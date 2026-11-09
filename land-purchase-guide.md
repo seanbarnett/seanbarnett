@@ -118,6 +118,23 @@ Each gate has a **stop condition**. Do not pay for the next gate until the previ
 
 ---
 
+## 4a. How to run Gate 0 on a listing (~20 min, free)
+Capture first: address or parcel ID, acreage, county, road, and the listing's claims about utilities, restrictions, and flood. A listing site's property ID is **not** a county account number. Get the county account number in step 1.
+
+| Step | Where | Record | Stop if |
+|---|---|---|---|
+| 1. Parcel lookup | County appraisal district (HCAD Harris; Montgomery CAD for Montgomery; search "[county] appraisal district"). Search by address, owner, or map click. | Account number, legal description (lot/block or abstract), acreage, owner name, **taxing units** (MUD, PID, city, ESD), land-use code, ag valuation, delinquent taxes | Owner ≠ seller; acreage differs materially from the listing; delinquent taxes; unexpected MUD/PID |
+| 2. City / ETJ | City planning dept. map ("[city] ETJ map"), or the city on the taxing-unit list | In city limits, in ETJ, or neither | In city limits: get a zoning verification before going further |
+| 3. Flood | msc.fema.gov (enter address); county/Harris flood mapping tools; Google Earth Pro historical imagery set to Sept 2017 (Harvey) and Sept 2019 (Imelda) | FEMA zone (X, AE, A, floodway); imagery of standing water; whether the pad is high ground | Floodway, or visible chronic flooding on pad or access |
+| 4. Access | Street View and Google Earth; appraisal-district map for frontage; county road-maintenance list | Frontage on a public road, or an easement route; road maintained by county/private | No frontage and no recorded easement visible |
+| 5. Restrictions | County Clerk real-property index (search the subdivision name, or the parent tract's owner for metes-and-bounds parcels) | Any "Restrictions," "Declaration," "Covenants" hits; HOA existence | Restrictions found that ban your use (read them in Gate 1). "Unrestricted" in a listing is marketing, not proof. |
+| 6. Wells / pipelines | Railroad Commission public GIS viewer | Wells or pipelines on or adjacent to the parcel | Pipeline or well pad on the only usable area |
+| 7. Utility hints | Street View (poles, meters, hydrants); MUD name from step 1 | Likely electric utility, likely water provider | Nothing nearby for a long way. Not an automatic kill; flag for Gate 4. |
+
+**Scoring:** mark each step Pass / Fail / Unknown. Any Fail ends the listing. Unknowns carry into Gates 1–4. Spend nothing until Gate 0 has no Fails.
+
+---
+
 ## 5. Questions to ask (literal wording)
 
 ### County (Harris: Engineering Dept. Permit Office; other counties: county engineer / road & bridge / health or environmental dept.)
@@ -220,3 +237,64 @@ Cost and time figures are rough planning placeholders. Replace them with local q
 3. **Call county engineering/permits** with the Section 5 county questions: legal-lot status, RV occupancy, multiple-dwelling, OSSF authority, driveway.
 4. **Get written utility confirmations:** electric will-serve and cost, water source (provider or well-permit status), and septic-agent guidance.
 5. **Go under contract with an option period and get the title commitment;** read every Schedule B instrument before ordering the survey, soil evaluation, or any design.
+
+---
+
+## 10. Financing by land use
+Rates, limits, and eligibility change. Treat this as structure and get written quotes. Lenders finance by **use**, and land-only loans are the most expensive money.
+
+| Use | Typical products | Notes |
+|---|---|---|
+| Raw land (nothing built) | Community banks, credit unions, Farm Credit lenders, seller financing | Often 20–50% down, shorter terms (5–20 yr), balloons, higher rates than a mortgage |
+| Land + one home (buy and build) | Construction-to-permanent loans (FHA, VA, conventional, USDA, Farm Credit "country home") | Cheapest long-term money, but built around **one primary dwelling** |
+| Land with existing house | Standard mortgage; USDA / FHA / VA / conventional | Easiest. Consider buying a tract with a house and adding the others later. |
+| Multiple houses, one parcel | Per-house mortgages only if each house is on a **separate legal lot**; otherwise blanket or commercial/LLC loan, or family-funded equity | The hard part of Path B |
+| RV only (Path A) | Land loan or cash for the lot; separate RV loan for the vehicle | RV loans don't finance land. A lot with an RV is raw land to a lender. |
+| Real farming operation | USDA FSA farm-ownership loans, Farm Credit | Only for a genuine ag business |
+
+### USDA
+- **Section 502 Guaranteed:** zero down, for a home in a USDA-eligible rural area, with household income limits. Finances **land + home**, not land alone; generally expects a single-family primary residence. Check property eligibility by address on USDA's site; many Houston suburbs are ineligible, some outlying areas qualify. Ask the lender whether other structures on the parcel are allowed.
+- **Section 502 Direct:** subsidized, for low and very-low income households; limited funds. Ask your local Rural Development office.
+- **FSA farm loans:** for actual farm operations (including beginning-farmer and down-payment programs); require a farm business plan.
+- **Rule of thumb:** USDA fits a single-home build on a clean legal lot. It does not fit multiple houses on one tract.
+
+### Other sources
+- **Texas Veterans Land Board land loan** (if a buyer is a Texas veteran): rural land, low down payment. Verify current terms, minimum acreage, and city-limit restrictions.
+- **VA / FHA:** home-focused; finance land only as part of a home purchase or construction via approved lenders.
+- **Farm Credit lenders** (e.g., Capital Farm Credit, Lone Star Ag Credit; confirm which serves your county): usually the best fit for 2–5 acre rural land and country homes.
+- **Texas home-equity cash-out / HELOC on an existing home:** often the cheapest down-payment source, but Texas caps home-equity debt at 80% of value [K] and the homestead rules are strict. Confirm with a lender/attorney.
+- **Seller financing:** only via a recorded deed of trust. Avoid contract-for-deed.
+- **Manufactured homes:** often chattel loans unless converted to real property under Texas titling rules. Attorney input needed.
+- **Cash / family funds:** often the only practical route for multi-house, multi-owner structures. Document gifts with letters and loans with written agreements.
+
+### Getting the best terms
+1. Buy a legal, platted, access-clean, flood-clean parcel. Lenders reject exactly what Gates 0–2 screen out.
+2. Match the loan to the use. Don't put a home build on a raw-land loan.
+3. Get 3–4 quotes in the same week: your bank/credit union, a Farm Credit lender, a mortgage broker (USDA, FHA, VA), and a community bank. Compare APR, down payment, term, prepayment penalty, and balloon date.
+4. Pre-qualify before offering. Ask each lender what they require on appraisal, survey, and acreage.
+5. For Path B ask up front: "Can you lend against one house on a separate lot? What do you need if title is held by an LLC or multiple relatives?"
+6. Buy Path A in cash or low-leverage debt if you may sell. A balloon due in 12–24 months creates pressure at the wrong time.
+
+---
+
+## 11. Gate 0 worksheet: 10814 Newton Cir, Conroe, TX 77303 (Montgomery County)
+Land.com Property ID 1071934 (listing title: 2.2 acres). **Status: Gate 0 not completed.** The listing page returned HTTP 403 to my fetch, and a web search found no record for this address. The only findings were *other* parcels on Newton Circle (see below), which are **not** facts about this parcel. Complete the steps yourself or send me the listing text.
+
+| Step | Status | Next action (Montgomery County specifics are [V]) |
+|---|---|---|
+| 1. Parcel lookup | **Unknown** | Search Montgomery CAD (mcad-tx.org) by address "10814 Newton Cir." Record account number, owner, acreage, taxing units (MUD? ESD?), delinquent taxes. If the address returns nothing, the listing address may be approximate: use the listing map pin. |
+| 2. City / ETJ | **Unknown** | Check Conroe city limits/ETJ via the City of Conroe planning map and the taxing-unit list from step 1 |
+| 3. Flood | **Unknown** | FEMA map + imagery from Sept 2017 and Sept 2019. The east-county area has flooding history from multiple events; do not assume dry. |
+| 4. Access | **Unknown** | Is Newton Cir county-maintained or private? Ask Montgomery County Engineering/road dept. |
+| 5. Restrictions | **Unknown** | Search the Montgomery County Clerk records for "Newton Acres" (a nearby subdivision name from search results) and for the parent tract. Neighbor listings advertise "unrestricted," which is marketing, so confirm via Schedule B. |
+| 6. Wells / pipelines | **Unknown** | RRC public GIS viewer |
+| 7. Utilities | **Unknown** | Electric provider is likely Entergy Texas or a co-op in this area [V]. Wells fall under Lone Star Groundwater Conservation District rules [V]. OSSF authority: ask Montgomery County's environmental/permits department. |
+
+**Leads from search (other parcels, unverified):** nearby Newton Circle listings described ~2-acre lots as "unrestricted," one with "history of no flooding"; a nearby home sold on 2.2 unrestricted acres. These suggest the area *may* be lightly restricted, but treat that as a hypothesis for Gates 1–3.
+
+**Questions to ask for this specific listing:**
+- "What is the Montgomery CAD account number and recorded legal description for 10814 Newton Cir.?"
+- "Is the lot platted (Newton Acres or other), or a metes-and-bounds tract? Are there recorded restrictions or an HOA?"
+- "Is the road county-maintained? Is legal access recorded?"
+- "Has the property flooded, including during Harvey and Imelda? Any flood insurance claims?"
+- "Is there a septic or well history, and which electric provider serves it?"
