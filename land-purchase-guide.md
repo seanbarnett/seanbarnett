@@ -278,7 +278,15 @@ Rates, limits, and eligibility change. Treat this as structure and get written q
 ---
 
 ## 11. Gate 0 worksheet: 10814 Newton Cir, Conroe, TX 77303 (Montgomery County)
-Land.com Property ID 1071934 (listing title: 2.2 acres). **Status: Gate 0 not completed.** The listing page returned HTTP 403 to my fetch, and a web search found no record for this address. The only findings were *other* parcels on Newton Circle (see below), which are **not** facts about this parcel. Complete the steps yourself or send me the listing text.
+Land.com Property ID 1071934. **Listing text supplied by user:** **OFF MARKET**, $129,900, 2.2 acres, **existing 3 bed / 2 bath, 1,776 sq ft preowned brick/wood house**, carport with workshop, "newer roof & A/C," "two full unrestricted acres," "horses allowed," conventional mortgage listed. The listing is *not* vacant land. The price and date are unverified and may be stale. **Gate 0 status: not completed.** My fetch of the page returned HTTP 403, and a web search found no record for this address; the other Newton Circle parcels in search results are not facts about this parcel.
+
+**What the listing changes**
+- **Off market:** it may be sold, withdrawn, or expired. Find the current owner in Montgomery CAD, then ask a local agent to check MLS history and status, or write to the owner.
+- **Existing house = Path B fit, not Path A:** it gives Path B a starting dwelling, likely existing septic and well/water (unverified), and ~2 acres for more. It is overbuilt and probably over-priced for Path A.
+- **Existing house raises new checks:** permits and age of the septic (OSSF) record, well/water source, flood history in the house itself, condition/inspection, and whether additional houses are allowed under septic area and setbacks. Existing improvements also mean the seller disclosure (Prop. Code §5.008) likely applies [K].
+- **"Unrestricted," "horses allowed":** marketing claims. Confirm via recorded restrictions (Gate 1) and Schedule B.
+- **Financing:** an existing home opens USDA/FHA/VA/conventional options (see §10). USDA eligibility depends on the address; check it. Adding more houses later is the hard part (separate lots, platting).
+- **Price sanity:** $129,900 for a 2.2-acre house near Conroe looks old or low. Treat it as a historical data point and get fresh comps.
 
 | Step | Status | Next action (Montgomery County specifics are [V]) |
 |---|---|---|
