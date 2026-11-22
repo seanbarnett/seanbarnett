@@ -1,0 +1,461 @@
+//@version=5
+// ─────────────────────────────────────────────────────────────────────────────
+// My FBD Levels (v1.3) — newsletter levels + flush / acceptance timer + bull/bear line + actionable levels
+//
+//  * Draws your three level lists: major supports (green, thick), minor levels
+//    (thin gray), major resistances (orange). Price numbers sit just BELOW each line.
+//  * Red banner "FLUSHED 7707 ≥ 2 points" when a MAJOR SUPPORT that price had been
+//    trading above is flushed by the flush distance (default 2 pts).
+//  * ACCEPTANCE TIMER (live, to the second):
+//      - After a flush, once price is back at the START line a GREEN timer counts up (m:ss) toward
+//        TIMER SETTINGS (default 2:00) and KEEPS COUNTING through any dip. At the target, if price is
+//        at/above the support, a green banner "ACCEPTED 7707 for 2m 00s" is posted.
+//        START line:  OFFSET = 0 ticks   -> the support level itself (Acceptance: count immediately).
+//                     OFFSET = 20 ticks  -> 20 ticks (5 pts on MES/ES) ABOVE the level (NAP, non-acceptance protocol).
+//      - A DIP is price falling below the MAJOR SUPPORT LINE itself (same in Acceptance and NAP), and it only
+//        counts AFTER the green timer has started. While price is below the line, a RED timer counts up to the
+//        GRACE time (default 15 s). Back above the line before it finishes = forgiven. Below for the full grace
+//        time = the count is invalidated, and price must recover the START line again to restart from 0:00.
+//        The green timer keeps counting through a dip. (In NAP, price between the support and the NAP line is
+//        just holding: no red timer.)
+//  * BULL/BEAR LINE: type Adam's line (a price or zone, e.g. 7751-55 = 7751 to 7755). One static dashed
+//    line at the zone's top edge with a faint band down to the bottom edge, plus a label with the session
+//    date (so a stale entry is obvious). Green above the zone, red below, gray inside (switchable).
+//  * ACTIONABLE LEVELS (v1.3): the levels Adam calls actionable in his plan (list [5] of fbd_inputs.txt). Each is a
+//    DASHED line in its own color (a zone such as 7570-72 gets a dashed line at each edge), drawn on top of the
+//    solid major-support lines, with a small label above it: ACTIONABLE or HIGHLY ACTIONABLE.
+//  * "Yesterday's low": one flat red line (with a label), computed from the chart, regular session only.
+//
+// Paste the three level lists from logs/fbd_inputs.txt (made by "sync lvls") into the settings.
+//
+// Notes / limits:
+//  - Timers are tick-live: they update whenever a new price tick arrives on the open chart. Anything that
+//    happened BEFORE the chart loaded is rebuilt from 1-minute bars (so those timings are minute-accurate).
+//  - The red FLUSHED banner stays after acceptance. Banners cover the current session only
+//    (the session starts 5:00 PM Central). Chart must be longer than 1 minute.
+// ─────────────────────────────────────────────────────────────────────────────
+indicator("My FBD Levels", shorttitle = "MyFBD", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 50)
+
+// ───────────────────────────── Inputs ─────────────────────────────
+G_T = "Timer / flush"
+timerSecs   = input.int(120, "TIMER SETTINGS - in seconds", minval = 1, group = G_T,
+     tooltip = "How long price must hold at/above the level (after a flush) before ACCEPTED is posted.")
+graceSecs   = input.int(15, "DIP GRACE - in seconds", minval = 1, group = G_T,
+     tooltip = "If price falls below the major support line while the timer is counting, a red timer counts up. Below for this long = the count is invalidated (the green timer keeps running through shorter dips).")
+offsetTicks = input.int(20, "OFFSET - ticks above the level before the timer counts", minval = 0, group = G_T,
+     tooltip = "0 = Acceptance (count immediately on recovering the level). 20 ticks = 5 pts on MES/ES = NAP.")
+flushPts    = input.float(2.0, "FLUSH distance (points below a major support)", minval = 0.25, step = 0.25, group = G_T)
+alertsOn    = input.bool(true, "Send alert() on FLUSHED / ACCEPTED (create one alert: 'Any alert() function call')", group = G_T)
+
+G_L = "Levels (paste from logs/fbd_inputs.txt)"
+majSupTxt = input.text_area("", "MAJOR SUPPORT LEVELS", group = G_L)
+minorTxt  = input.text_area("", "MINOR LEVELS", group = G_L)
+majResTxt = input.text_area("", "MAJOR RESISTANCE LEVELS", group = G_L)
+
+G_A = "Actionable levels (Adam's plan, dashed)"
+actTxt = input.text_area("", "ACTIONABLE LEVELS", group = G_A,
+     tooltip = "Paste list [5] from logs/fbd_inputs.txt, e.g. 7570-72 (highly actionable), 7494 (highly actionable), 7455 (actionable). Each level is drawn as a DASHED line (a zone gets a dashed line at each edge) so it stands apart from the solid major supports. The words in brackets only change the label.")
+cAct  = input.color(#ffd600, "Actionable line color", group = G_A)
+wAct  = input.int(2, "Actionable line width", minval = 1, maxval = 5, group = G_A)
+showActLbls = input.bool(true, "Label each actionable level (ACTIONABLE / HIGHLY ACTIONABLE)", group = G_A)
+
+G_B = "Bull / bear lines (from Adam's newsletter / X posts)"
+bbTxt = input.text_area("", "BULL/BEAR LINE", group = G_B,
+     tooltip = "A price or zone, e.g. 7751-55 (meaning 7751 to 7755). Separate several with commas (7490, 7560) and they are drawn and labeled 1, 2, ... Static for the session.")
+bbColorByRegime = input.bool(true, "Color the line by regime (green above / red below / gray inside)", group = G_B)
+cBull    = input.color(#4a9b82, "Price above the line", group = G_B)
+cBear    = input.color(#ef5350, "Price below the line", group = G_B)
+cNeutral = input.color(#b2b5be, "Inside the zone / fixed color", group = G_B)
+
+G_S = "Style"
+cMajSup  = input.color(#4a9b82, "Major support color", group = G_S)
+wMajSup  = input.int(2, "Major support width", minval = 1, maxval = 5, group = G_S)
+cMinor   = input.color(#787b86, "Minor level color", group = G_S)
+wMinor   = input.int(1, "Minor level width", minval = 1, maxval = 5, group = G_S)
+cMajRes  = input.color(#ff9800, "Major resistance color", group = G_S)
+wMajRes  = input.int(1, "Major resistance width", minval = 1, maxval = 5, group = G_S)
+cFlush   = input.color(#ef5350, "FLUSHED banner / red timer / yesterday-low color", group = G_S)
+cAccept  = input.color(#4a9b82, "ACCEPTED banner / green timer color", group = G_S)
+showPrices = input.bool(true, "Show price numbers on levels (just below the line)", group = G_S)
+lblOffset  = input.int(10, "Label position (bars right of last bar)", minval = 0, group = G_S)
+bannerLatestOnly = input.bool(true, "Show only the latest FLUSHED / ACCEPTED banner", group = G_S,
+     tooltip = "On: just the most recent banner is drawn; it disappears as soon as price flushes or accepts another level (or flushes the same one again). Off: every banner of the session stays.")
+bannerFadeMins = input.int(15, "Banners fade out after (minutes, 0 = never)", minval = 0, group = G_S,
+     tooltip = "A banner gets fainter as it ages and disappears this many minutes after the flush / acceptance happened.")
+bannerOffset = input.int(3, "FLUSHED / ACCEPTED banner offset (bars left of the candle)", minval = 2, group = G_S,
+     tooltip = "Moves each banner this many bars to the left of the candle where it happened, joined by a thin line, so it doesn't cover the candle.")
+
+G_V = "Visibility / session"
+minTf  = input.int(15, "Show only on timeframes from (minutes)", minval = 1, group = G_V)
+maxTf  = input.int(120, "... up to (minutes)", minval = 1, group = G_V)
+sessStr = input.session("0930-1600", "Regular session (for yesterday's low)", group = G_V)
+sessTz  = input.string("America/New_York", "Session time zone", group = G_V)
+
+// ───────────────────────────── Helpers ─────────────────────────────
+tzC = "America/Chicago"
+
+parseList(string txt) =>
+    array<float> out = array.new_float()
+    string s = str.replace_all(str.replace_all(str.replace_all(txt, " ", ""), "\n", ","), "\r", "")
+    if str.length(s) > 0
+        array<string> parts = str.split(s, ",")
+        for i = 0 to array.size(parts) - 1
+            float v = str.tonumber(array.get(parts, i))
+            if not na(v)
+                array.push(out, v)
+    out
+
+fmtSecs(int secs) =>
+    int m = math.floor(secs / 60)
+    int r = secs - m * 60
+    str.tostring(m) + "m " + (r < 10 ? "0" : "") + str.tostring(r) + "s"
+
+fmtClock(float ms) =>
+    int secs = math.max(0, math.floor(ms / 1000))
+    int m = math.floor(secs / 60)
+    int r = secs - m * 60
+    str.tostring(m) + ":" + (r < 10 ? "0" : "") + str.tostring(r)
+
+mkLine(float p, color c, int w) =>
+    line.new(bar_index, p, bar_index + 1, p, extend = extend.both, color = c, width = w)
+
+mkDash(float p, color c, int w) =>
+    line.new(bar_index, p, bar_index + 1, p, extend = extend.both, color = c, style = line.style_dashed, width = w)
+
+// number sits just BELOW the line, starting at the label position
+mkPriceLabel(float p, color c) =>
+    label.new(bar_index, p, str.tostring(p, "#.##"), color = color.new(color.black, 100), textcolor = c, style = label.style_label_upper_left, size = size.small)
+
+// Futures session start (5:00 PM Central) at or before "now"
+f_sessStart() =>
+    int y = year(timenow, tzC)
+    int mo = month(timenow, tzC)
+    int d = dayofmonth(timenow, tzC)
+    int h = hour(timenow, tzC)
+    h >= 17 ? timestamp(tzC, y, mo, d, 17, 0) : timestamp(tzC, y, mo, d - 1, 17, 0)
+
+// "7751-55" / "7736" / "7751-7755" -> [low, high]. The second number of a range may be abbreviated
+// ("55" = 7755) and may be written in either direction ("7755-51").
+f_zone(string v) =>
+    array<string> p = str.split(v, "-")
+    float a = str.tonumber(array.get(p, 0))
+    float lo = a
+    float hi = a
+    if array.size(p) > 1 and not na(a)
+        string bs = array.get(p, 1)
+        float b = str.tonumber(bs)
+        int ka = str.length(array.get(p, 0))
+        int kb = str.length(bs)
+        if kb < ka and not na(b)
+            float pw = math.pow(10, kb)
+            float baseN = math.floor(a / pw)
+            float best = baseN * pw + b
+            float c1 = (baseN + 1) * pw + b
+            float c2 = (baseN - 1) * pw + b
+            if math.abs(c1 - a) < math.abs(best - a)
+                best := c1
+            if math.abs(c2 - a) < math.abs(best - a)
+                best := c2
+            b := best
+        lo := math.min(a, b)
+        hi := math.max(a, b)
+    [lo, hi]
+
+tfOk = (timeframe.in_seconds() / 60.0) >= minTf and (timeframe.in_seconds() / 60.0) <= maxTf
+var int sessStart = f_sessStart()
+float offsetPts = offsetTicks * syminfo.mintick
+
+// ───────────────────────────── Levels ─────────────────────────────
+var array<float> majSup  = parseList(majSupTxt)
+var array<float> minorLv = parseList(minorTxt)
+var array<float> majRes  = parseList(majResTxt)
+var array<label> priceLbls = array.new_label()
+
+if barstate.isfirst and tfOk
+    for p in minorLv
+        mkLine(p, cMinor, wMinor)
+        if showPrices
+            array.push(priceLbls, mkPriceLabel(p, cMinor))
+    for p in majRes
+        mkLine(p, cMajRes, wMajRes)
+        if showPrices
+            array.push(priceLbls, mkPriceLabel(p, cMajRes))
+    for p in majSup
+        mkLine(p, cMajSup, wMajSup)
+        if showPrices
+            array.push(priceLbls, mkPriceLabel(p, cMajSup))
+
+if barstate.islast and showPrices and tfOk
+    for lb in priceLbls
+        label.set_x(lb, bar_index + lblOffset)
+
+// ───────────────── Actionable levels (dashed, drawn after the solid lines so they sit on top) ─────────────────
+// "7570-72 (highly actionable), 7494 (highly actionable), 7455 (actionable)": the text before "(" is the level or
+// zone, the words in brackets (lowercase) only choose the label. Every line is exactly 1 bar long (see the Banners note).
+var array<label> actLbls = array.new_label()
+
+if barstate.isfirst and tfOk
+    string rawAct = str.replace_all(str.replace_all(actTxt, "\n", ","), "\r", "")
+    if str.length(str.replace_all(rawAct, " ", "")) > 0
+        array<string> actParts = str.split(rawAct, ",")
+        for kAct = 0 to array.size(actParts) - 1
+            string actPart = str.replace_all(array.get(actParts, kAct), " ", "")
+            if str.length(actPart) > 0
+                int actPos = str.pos(actPart, "(")
+                string actZone = na(actPos) ? actPart : str.substring(actPart, 0, actPos)
+                bool actHot = not na(str.pos(actPart, "highly"))
+                bool actRec = not na(str.pos(actPart, "reclaim"))
+                [alo, ahi] = f_zone(actZone)
+                if not na(alo) and not na(ahi)
+                    mkDash(ahi, cAct, wAct)
+                    if alo != ahi
+                        mkDash(alo, cAct, wAct)
+                    if showActLbls
+                        string actRng = alo == ahi ? str.tostring(ahi, "#.##") : str.tostring(alo, "#.##") + "–" + str.tostring(ahi, "#.##")
+                        string actWord = actHot ? "HIGHLY ACTIONABLE " : (actRec ? "ACTIONABLE RECLAIM " : "ACTIONABLE ")
+                        array.push(actLbls, label.new(bar_index, ahi, actWord + actRng, color = color.new(color.black, 100), textcolor = cAct, style = label.style_label_lower_left, size = size.small))
+
+if barstate.islast and tfOk and array.size(actLbls) > 0
+    for alb in actLbls
+        label.set_x(alb, bar_index + lblOffset)
+
+// ───────────────────────── Bull / bear lines (static; one or more, comma-separated) ─────────────────────────
+// "7490, 7560" -> line 1 = 7490, line 2 = 7560. Each is a price or a zone ("7751-55").
+var array<float> bbLos   = array.new_float()
+var array<float> bbHis   = array.new_float()
+var array<line>  bbLines = array.new<line>()
+var array<box>   bbBoxes = array.new<box>()
+var array<label> bbLbls  = array.new<label>()
+
+if barstate.isfirst and tfOk
+    string rawBb = str.replace_all(str.replace_all(str.replace_all(bbTxt, " ", ""), "\n", ""), "\r", "")
+    int eqBb = str.pos(rawBb, "=")
+    string vBb = na(eqBb) ? rawBb : str.substring(rawBb, eqBb + 1)
+    if str.length(vBb) > 0
+        array<string> parts = str.split(vBb, ",")
+        for k = 0 to array.size(parts) - 1
+            string part = array.get(parts, k)
+            if str.length(part) > 0
+                [zlo, zhi] = f_zone(part)
+                if not na(zlo) and not na(zhi)
+                    array.push(bbLos, zlo)
+                    array.push(bbHis, zhi)
+                    array.push(bbLines, line.new(bar_index, zhi, bar_index + 1, zhi, extend = extend.both, color = cNeutral, style = line.style_dashed, width = 2))
+                    array.push(bbBoxes, box.new(bar_index, zhi, bar_index + 1, zlo, extend = extend.both, border_color = color.new(cNeutral, 100), bgcolor = color.new(cNeutral, 85)))
+
+if barstate.islast and tfOk and array.size(bbHis) > 0
+    int nBb = array.size(bbHis)
+    string sdate = str.format_time(sessStart + 8 * 3600000, "EEE MM/dd", tzC)
+    for k = 0 to nBb - 1
+        float lo = array.get(bbLos, k)
+        float hi = array.get(bbHis, k)
+        string reg = close > hi ? "BULL" : close < lo ? "BEAR" : "INSIDE"
+        color rc = bbColorByRegime ? (reg == "BULL" ? cBull : reg == "BEAR" ? cBear : cNeutral) : cNeutral
+        line.set_color(array.get(bbLines, k), rc)
+        box.set_bgcolor(array.get(bbBoxes, k), color.new(rc, 85))
+        string rng = lo == hi ? str.tostring(lo, "#.##") : str.tostring(lo, "#.##") + "–" + str.tostring(hi, "#.##")
+        string tag = nBb > 1 ? "BULL/BEAR " + str.tostring(k + 1) : "BULL/BEAR"
+        string btxt = tag + " " + rng + " · " + reg + "  (" + sdate + ")"
+        if array.size(bbLbls) <= k
+            array.push(bbLbls, label.new(bar_index + lblOffset, hi, btxt, style = label.style_label_left, color = rc, textcolor = color.white, size = size.normal))
+        else
+            label l = array.get(bbLbls, k)
+            label.set_xy(l, bar_index + lblOffset, hi)
+            label.set_text(l, btxt)
+            label.set_color(l, rc)
+
+
+// ───────────────────── Flush -> recovery timer -> accepted state machine ─────────────────────
+// Per major support (all varip, so live ticks accumulate):
+//   state : -1 = not armed yet (price hasn't traded above it this session), 0 = armed,
+//            1 = flushed (waiting for / running the recovery timer), 2 = accepted
+//   start : clock time (ms) the recovery timer started (0 = not running). The green timer = now - start.
+//   below : clock time (ms) the current dip BELOW THE SUPPORT LEVEL began (0 = none). Red timer = now - below.
+int nMaj = array.size(majSup)
+varip array<int> sState = array.new_int(nMaj, -1)
+varip array<int> sStart = array.new_int(nMaj, 0)
+varip array<int> sBelow = array.new_int(nMaj, 0)
+// Events (banners): bar index, level, type (1 = flushed, 2 = accepted), seconds held
+varip array<int>   evBar = array.new_int()
+varip array<float> evLvl = array.new_float()
+varip array<int>   evTyp = array.new_int()
+varip array<int>   evSec = array.new_int()
+varip array<int>   evT   = array.new_int()     // clock time (ms) of the event
+varip bool rtDone = false
+
+f_emit(int typ, float lv, int secs, int t) =>
+    array.push(evBar, bar_index)
+    array.push(evLvl, lv)
+    array.push(evTyp, typ)
+    array.push(evSec, secs)
+    array.push(evT, t)
+    if array.size(evBar) > 150
+        array.shift(evBar)
+        array.shift(evLvl)
+        array.shift(evTyp)
+        array.shift(evSec)
+        array.shift(evT)
+    if alertsOn and barstate.isrealtime
+        alert(typ == 1 ? "FLUSHED " + str.tostring(lv, "#.##") : "ACCEPTED " + str.tostring(lv, "#.##") + " for " + fmtSecs(secs), alert.freq_all)
+    0
+
+// One observation of the price (at time t, in ms) for one major support
+f_step(int i, float lvl, float price, int t) =>
+    int st = array.get(sState, i)
+    if st == -1
+        if price >= lvl
+            array.set(sState, i, 0)
+    else
+        if st != 1 and price <= lvl - flushPts
+            array.set(sState, i, 1)
+            array.set(sStart, i, 0)
+            array.set(sBelow, i, 0)
+            f_emit(1, lvl, 0, t)
+            st := 1
+        if st == 1
+            int startT = array.get(sStart, i)
+            if startT == 0
+                // waiting for recovery: the clock starts when price is back at the START line
+                if price >= lvl + offsetPts
+                    array.set(sStart, i, t)
+                    array.set(sBelow, i, 0)
+            else
+                // clock running: it keeps counting through dips
+                if price < lvl
+                    int bt = array.get(sBelow, i)
+                    if bt == 0
+                        array.set(sBelow, i, t)
+                    else if t - bt >= graceSecs * 1000
+                        array.set(sStart, i, 0)          // below the level for the full grace: invalidated
+                        array.set(sBelow, i, 0)
+                else
+                    array.set(sBelow, i, 0)
+                    if t - startT >= timerSecs * 1000
+                        array.set(sState, i, 2)
+                        array.set(sStart, i, 0)
+                        f_emit(2, lvl, timerSecs, t)
+    0
+
+string lowerTf = timeframe.in_seconds() > 60 ? "1" : "1S"
+[subLow, subClose, subTime] = request.security_lower_tf(syminfo.tickerid, lowerTf, [low, close, time])
+
+// (1) History, and the moment the chart goes live: replay 1-minute bars of the CURRENT session.
+//     Each minute is two observations: its low (20 s in) and its close (at 60 s).
+if tfOk and nMaj > 0 and (barstate.ishistory or (barstate.isrealtime and not rtDone))
+    int nSub = array.size(subClose)
+    int lastIdx = nSub - 1
+    // (nested on purpose: Pine evaluates every part of an `and`, so array.get must only run when nSub > 0)
+    if barstate.isrealtime and nSub > 0
+        if array.get(subTime, nSub - 1) + 60000 > timenow
+            lastIdx := nSub - 2      // skip the minute still in progress; live ticks take over from here
+    if lastIdx >= 0
+        for k = 0 to lastIdx
+            int ts = array.get(subTime, k)
+            if ts >= sessStart
+                for i = 0 to nMaj - 1
+                    float lvl = array.get(majSup, i)
+                    f_step(i, lvl, array.get(subLow, k), ts + 20000)
+                    f_step(i, lvl, array.get(subClose, k), ts + 60000)
+if barstate.isrealtime
+    rtDone := true
+
+// (2) Live: every tick on the realtime bar is one observation at the real clock time.
+if tfOk and nMaj > 0 and barstate.isrealtime
+    for i = 0 to nMaj - 1
+        f_step(i, array.get(majSup, i), close, timenow)
+
+// ───────────────────────────── Live timers ─────────────────────────────
+var array<label> tGreen = array.new_label()
+var array<label> tRed   = array.new_label()
+if barstate.isfirst and tfOk
+    for p in majSup
+        array.push(tGreen, label.new(bar_index, p, "", style = label.style_label_lower_left, color = color.new(cAccept, 100), textcolor = color.new(color.white, 100), size = size.normal))
+        array.push(tRed, label.new(bar_index, p, "", style = label.style_label_upper_left, color = color.new(cFlush, 100), textcolor = color.new(color.white, 100), size = size.normal))
+
+// Timers are shown only while the chart is live (they are wall-clock timers).
+if barstate.islast and barstate.isrealtime and tfOk and nMaj > 0
+    for i = 0 to nMaj - 1
+        float lvl = array.get(majSup, i)
+        label g = array.get(tGreen, i)
+        label r = array.get(tRed, i)
+        int startT = array.get(sStart, i)
+        bool counting = startT > 0 and array.get(sState, i) == 1
+        if counting
+            label.set_xy(g, bar_index + 1, lvl)
+            label.set_text(g, fmtClock(math.min(timenow - startT, timerSecs * 1000)))
+            label.set_color(g, cAccept)
+            label.set_textcolor(g, color.white)
+        else
+            label.set_text(g, "")
+            label.set_color(g, color.new(cAccept, 100))
+            label.set_textcolor(g, color.new(color.white, 100))
+        int bt = array.get(sBelow, i)
+        if counting and bt > 0
+            label.set_xy(r, bar_index + 1, lvl)
+            label.set_text(r, fmtClock(math.min(timenow - bt, graceSecs * 1000)))
+            label.set_color(r, cFlush)
+            label.set_textcolor(r, color.white)
+        else
+            label.set_text(r, "")
+            label.set_color(r, color.new(cFlush, 100))
+            label.set_textcolor(r, color.new(color.white, 100))
+
+// ───────────────────────────── Banners ─────────────────────────────
+// Redrawn on the last bar from the event list, so repeated realtime ticks never stack duplicates.
+// Each banner sits `bannerOffset` bars to the LEFT of the candle where it happened, joined to it by a thin
+// connector line, so it never covers the current candle. Banner connector lines are recognised by being
+// 2+ bars long (every other line the script draws is exactly 1 bar long), and are cleared with the labels.
+if barstate.islast and tfOk
+    for lb in label.all
+        string t = label.get_text(lb)
+        if str.startswith(t, "FLUSHED") or str.startswith(t, "ACCEPTED")
+            label.delete(lb)
+    for ln in line.all
+        if line.get_x2(ln) - line.get_x1(ln) >= 2
+            line.delete(ln)
+    int ne = array.size(evBar)
+    if ne > 0
+        int firstEv = bannerLatestOnly ? ne - 1 : 0
+        for e = firstEv to ne - 1
+            int typ = array.get(evTyp, e)
+            float lv = array.get(evLvl, e)
+            int xe = array.get(evBar, e)
+            int xb = math.max(0, xe - bannerOffset)
+            int ageMs = timenow - array.get(evT, e)
+            bool expired = bannerFadeMins > 0 and ageMs >= bannerFadeMins * 60000
+            int tr = bannerFadeMins > 0 ? math.min(85, math.round(85.0 * ageMs / (bannerFadeMins * 60000.0))) : 0
+            color bc = color.new(typ == 1 ? cFlush : cAccept, tr)
+            color tc = color.new(color.white, tr)
+            string txt = typ == 1 ? "FLUSHED " + str.tostring(lv, "#.##") + " ≥ " + str.tostring(flushPts, "#.##") + " points" : "ACCEPTED " + str.tostring(lv, "#.##") + " for " + fmtSecs(array.get(evSec, e))
+            if not expired
+                label.new(xb, lv, txt, xloc.bar_index, yloc.price, color = bc, textcolor = tc, style = label.style_label_right, size = size.normal)
+                line.new(xb, lv, xe, lv, xloc.bar_index, extend.none, color = bc, width = 2)
+
+// ───────────────────── Yesterday's regular-session low ─────────────────────
+inRth = not na(time(timeframe.period, sessStr, sessTz))
+var float curLow  = na
+var float prevLow = na
+if inRth
+    if not inRth[1]
+        prevLow := curLow
+        curLow := low
+    else
+        curLow := math.min(curLow, low)
+
+// ONE flat red line at the most recent completed regular session's low: during the regular session that
+// is yesterday's low; outside it (pre-market / after the close) it is the last session's low, i.e. what
+// "yesterday" will be for the next session. (A plotted series would step between days and draw diagonals.)
+var line  ydLine = na
+var label ydLbl  = na
+if barstate.islast and tfOk
+    float ydLow = inRth ? prevLow : curLow
+    if not na(ydLow)
+        string ydTxt = "YDAY LOW " + str.tostring(ydLow, "#.##")
+        if na(ydLine)
+            ydLine := line.new(bar_index, ydLow, bar_index + 1, ydLow, extend = extend.both, color = cFlush, width = 2)
+            ydLbl := label.new(bar_index + lblOffset, ydLow, ydTxt, style = label.style_label_upper_left, color = color.new(color.black, 100), textcolor = cFlush, size = size.small)
+        else
+            line.set_xy1(ydLine, bar_index, ydLow)
+            line.set_xy2(ydLine, bar_index + 1, ydLow)
+            label.set_xy(ydLbl, bar_index + lblOffset, ydLow)
+            label.set_text(ydLbl, ydTxt)
