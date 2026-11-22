@@ -56,7 +56,7 @@ G_A = "Actionable levels (Adam's plan, dashed)"
 actTxt = input.text_area("", "ACTIONABLE LEVELS", group = G_A,
      tooltip = "Paste list [5] from logs/fbd_inputs.txt, e.g. 7570-72 (highly actionable), 7494 (highly actionable), 7455 (actionable). Each level is drawn as a DASHED line (a zone gets a dashed line at each edge) so it stands apart from the solid major supports. The words in brackets only change the label.")
 cAct  = input.color(#ffd600, "Actionable line color", group = G_A)
-wAct  = input.int(2, "Actionable line width", minval = 1, maxval = 5, group = G_A)
+wAct  = input.int(3, "Actionable line width", minval = 1, maxval = 5, group = G_A)
 showActLbls = input.bool(true, "Label each actionable level (ACTIONABLE / HIGHLY ACTIONABLE)", group = G_A)
 
 G_B = "Bull / bear lines (from Adam's newsletter / X posts)"
@@ -194,6 +194,7 @@ if barstate.islast and showPrices and tfOk
 // "7570-72 (highly actionable), 7494 (highly actionable), 7455 (actionable)": the text before "(" is the level or
 // zone, the words in brackets (lowercase) only choose the label. Every line is exactly 1 bar long (see the Banners note).
 var array<label> actLbls = array.new_label()
+var array<float> actLv   = array.new_float()     // level used for the ACTIONABLE FBD alert (zone = lower edge)
 
 if barstate.isfirst and tfOk
     string rawAct = str.replace_all(str.replace_all(actTxt, "\n", ","), "\r", "")
@@ -208,6 +209,7 @@ if barstate.isfirst and tfOk
                 bool actRec = not na(str.pos(actPart, "reclaim"))
                 [alo, ahi] = f_zone(actZone)
                 if not na(alo) and not na(ahi)
+                    array.push(actLv, alo)
                     mkDash(ahi, cAct, wAct)
                     if alo != ahi
                         mkDash(alo, cAct, wAct)
@@ -219,6 +221,26 @@ if barstate.isfirst and tfOk
 if barstate.islast and tfOk and array.size(actLbls) > 0
     for alb in actLbls
         label.set_x(alb, bar_index + lblOffset)
+
+// ACTIONABLE FBD alert: price trades at/above an actionable level, flushes it by the FLUSH distance, then
+// closes back at/above it -> alert "ACTIONABLE FBD 7494". Zones use their lower edge. Re-arms after each alert.
+// State: -1 = not armed, 0 = armed, 1 = flushed. Live ticks use the last price; history uses bar high/low/close.
+int nAct = array.size(actLv)
+varip array<int> aState = array.new_int(nAct, -1)
+if tfOk and nAct > 0 and time >= sessStart
+    float pLo = barstate.isrealtime ? close : low
+    float pHi = barstate.isrealtime ? close : high
+    for i = 0 to nAct - 1
+        float lv = array.get(actLv, i)
+        int st = array.get(aState, i)
+        if st == -1 and pHi >= lv
+            array.set(aState, i, 0)
+        else if st == 0 and pLo <= lv - flushPts
+            array.set(aState, i, 1)
+        else if st == 1 and close >= lv
+            array.set(aState, i, 0)
+            if alertsOn and barstate.isrealtime
+                alert("ACTIONABLE FBD " + str.tostring(lv, "#.##") + " - flushed " + str.tostring(flushPts, "#.##") + "+ pts and reclaimed", alert.freq_all)
 
 // ───────────────────────── Bull / bear lines (static; one or more, comma-separated) ─────────────────────────
 // "7490, 7560" -> line 1 = 7490, line 2 = 7560. Each is a price or a zone ("7751-55").
