@@ -3,7 +3,7 @@
 // My FBD Levels (v1.3) — newsletter levels + flush / acceptance timer + bull/bear line + actionable levels
 //
 //  * Draws your three level lists: major supports (green, thick), minor levels
-//    (thin gray), major resistances (orange). Price numbers sit just BELOW each line.
+//    (thin gray), major resistances (orange). Price numbers sit ON each line (inline, right side).
 //  * Red banner "FLUSHED 7707 ≥ 2 points" when a MAJOR SUPPORT that price had been
 //    trading above is flushed by the flush distance (default 2 pts).
 //  * ACCEPTANCE TIMER (live, to the second):
@@ -76,7 +76,7 @@ cMajRes  = input.color(#ff9800, "Major resistance color", group = G_S)
 wMajRes  = input.int(1, "Major resistance width", minval = 1, maxval = 5, group = G_S)
 cFlush   = input.color(#ef5350, "FLUSHED banner / red timer / yesterday-low color", group = G_S)
 cAccept  = input.color(#4a9b82, "ACCEPTED banner / green timer color", group = G_S)
-showPrices = input.bool(true, "Show price numbers on levels (just below the line)", group = G_S)
+showPrices = input.bool(true, "Show price numbers on levels (inline with the line)", group = G_S)
 lblOffset  = input.int(10, "Label position (bars right of last bar)", minval = 0, group = G_S)
 bannerLatestOnly = input.bool(true, "Show only the latest FLUSHED / ACCEPTED banner", group = G_S,
      tooltip = "On: just the most recent banner is drawn; it disappears as soon as price flushes or accepts another level (or flushes the same one again). Off: every banner of the session stays.")
@@ -122,9 +122,10 @@ mkLine(float p, color c, int w) =>
 mkDash(float p, color c, int w) =>
     line.new(bar_index, p, bar_index + 1, p, extend = extend.both, color = c, style = line.style_dashed, width = w)
 
-// number sits just BELOW the line, starting at the label position
+// number sits ON the line (vertically centred), starting at the label position; the chart-colored
+// background masks the line behind the text so it reads cleanly
 mkPriceLabel(float p, color c) =>
-    label.new(bar_index, p, str.tostring(p, "#.##"), color = color.new(color.black, 100), textcolor = c, style = label.style_label_upper_left, size = size.small)
+    label.new(bar_index, p, str.tostring(p, "#.##"), color = chart.bg_color, textcolor = c, style = label.style_label_left, size = size.small)
 
 // Futures session start (5:00 PM Central) at or before "now"
 f_sessStart() =>
