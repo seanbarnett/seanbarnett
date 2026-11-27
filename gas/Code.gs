@@ -267,41 +267,26 @@ function getBudget(ss) {
   var TYPES = { 'income': 1, 'expense': 1 };
   var GROUPS = { 'income': 1, 'fixed bills': 1, 'guilt free spend': 1, 'save & invest': 1 };
 
-  var actuals = {};
-  var budgets = {};
+  // The sheet has two side-by-side tables that both look like
+  // Type | Group | Category | <number>: one headed "Actuals", one headed
+  // "Budget". Scanning for that shape anywhere (as this used to) matches
+  // both and double-counts, so find each table by its header cells and
+  // read only that table.
+  var actuals = sumBlock(data, 'actuals', TYPES, GROUPS);
+  var budgets = sumBlock(data, 'budget', TYPES, GROUPS);
 
-  for (var r = 0; r < data.length; r++) {
-    var row = data[r];
-    for (var c = 0; c + 3 < row.length; c++) {
-      var typeVal = String(row[c] || '').trim().toLowerCase();
-      var groupVal = String(row[c + 1] || '').trim().toLowerCase();
-      var catVal = String(row[c + 2] || '').trim();
-      var amtVal = row[c + 3];
-
-      if (TYPES[typeVal] && GROUPS[groupVal] && catVal && typeof amtVal === 'number') {
-        var key = typeVal + '|' + groupVal + '|' + catVal;
-        actuals[key] = (actuals[key] || 0) + Math.abs(amtVal);
-      }
-    }
-  }
-
-  for (var r = 0; r < data.length; r++) {
-    var row = data[r];
-    for (var c = 0; c + 3 < row.length; c++) {
-      var typeVal = String(row[c] || '').trim().toLowerCase();
-      var groupVal = String(row[c + 1] || '').trim().toLowerCase();
-      var catVal = String(row[c + 2] || '').trim();
-      var amtVal = row[c + 3];
-
-      if (TYPES[typeVal] && GROUPS[groupVal] && catVal && typeof amtVal === 'number' && amtVal > 0) {
-        var key = typeVal + '|' + groupVal + '|' + catVal;
-        if (!budgets[key]) budgets[key] = amtVal;
-      }
-    }
-  }
+  // Union of both tables: a category can be budgeted but have no actuals
+  // yet (or the reverse), and either way it belongs in the group totals.
+  var keys = {};
+  for (var k in actuals) keys[k] = 1;
+  for (var k in budgets) keys[k] = 1;
 
   var grouped = {};
-  for (var key in actuals) {
+  for (var key in keys) {
+    var a = actuals[key] || 0;
+    var b = budgets[key] || 0;
+    if (!a && !b) continue;
+
     var parts = key.split('|');
     var type = parts[0];
     var group = parts[1];
@@ -311,8 +296,8 @@ function getBudget(ss) {
     }
     grouped[group].categories.push({
       name: cat,
-      actual: round2(actuals[key]),
-      budget: round2(budgets[key] || 0),
+      actual: round2(a),
+      budget: round2(b),
     });
   }
 
@@ -331,6 +316,47 @@ function getBudget(ss) {
     period: findCellValue(data, 'Budget Setup/Budget Period') || '—',
     groups: groups,
   };
+}
+
+// Sums one Type | Group | Category | <amountLabel> table, located by finding
+// a header row with those four labels side by side. Returns a map of
+// "type|group|category" -> total. Amounts are made positive; income rows are
+// already positive and expense rows are stored as negatives in the sheet.
+function sumBlock(data, amountLabel, TYPES, GROUPS) {
+  var totals = {};
+  var start = null;
+
+  for (var r = 0; r < data.length && !start; r++) {
+    var row = data[r];
+    for (var c = 0; c + 3 < row.length; c++) {
+      if (cellText(row[c]) === 'type' &&
+          cellText(row[c + 1]) === 'group' &&
+          cellText(row[c + 2]) === 'category' &&
+          cellText(row[c + 3]) === amountLabel) {
+        start = { row: r, col: c };
+        break;
+      }
+    }
+  }
+  if (!start) return totals;
+
+  for (var i = start.row + 1; i < data.length; i++) {
+    var row = data[i];
+    var typeVal = cellText(row[start.col]);
+    var groupVal = cellText(row[start.col + 1]);
+    var catVal = String(row[start.col + 2] || '').trim();
+    var amtVal = row[start.col + 3];
+
+    if (TYPES[typeVal] && GROUPS[groupVal] && catVal && typeof amtVal === 'number') {
+      var key = typeVal + '|' + groupVal + '|' + catVal;
+      totals[key] = (totals[key] || 0) + Math.abs(amtVal);
+    }
+  }
+  return totals;
+}
+
+function cellText(v) {
+  return String(v === null || v === undefined ? '' : v).trim().toLowerCase();
 }
 
 // ─── Targets ─────────────────────────────────────────────────────────────────
